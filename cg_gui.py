@@ -187,6 +187,7 @@ class MainWindow(QMainWindow):
         # 连接信号和槽函数
         exit_act.triggered.connect(qApp.quit)
         line_naive_act.triggered.connect(self.line_naive_action)
+        line_dda_act.triggered.connect(self.line_dda_action)
         self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
 
         # 设置主窗口的布局
@@ -211,6 +212,11 @@ class MainWindow(QMainWindow):
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
 
+    def line_dda_action(self):
+        self.canvas_widget.start_draw_line('DDA',self.get_id())
+        self.statusBar().showMessage('DDA算法绘制线段')
+        self.list_widget.clearSelection()
+        self.canvas_widget.clear_selection()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
