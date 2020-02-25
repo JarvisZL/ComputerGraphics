@@ -33,7 +33,7 @@ def draw_line(p_list, algorithm):
             y = y0
             dis = y1 - y0
             while dis >= 0:
-                result.append((x,int(y+0.5)))
+                result.append([x,int(y+0.5)])
                 y = y + 1
                 dis = dis -1
         else: # k存在
@@ -43,20 +43,69 @@ def draw_line(p_list, algorithm):
             if k <= 1 and k >= -1:
                 y = y0
                 for x in range(x0, x1 + 1):
-                    result.append((x,int(y+0.5)))
+                    result.append([x,int(y+0.5)])
                     y = y + k
             elif k > 1:
                 x = x0
                 for y in range(y0, y1 + 1):
-                    result.append((int(x+0.5),y))
+                    result.append([int(x+0.5),y])
                     x = x + 1/k
             elif k < -1:
                 x = x1 #match the range
                 for y in range(y1, y0 + 1):
-                    result.append((int(x+0.5),y))
+                    result.append([int(x+0.5),y])
                     x = x + 1/k
     elif algorithm == 'Bresenham':
-        pass
+        if x0 > x1:
+            x0, y0, x1, y1 = x1, y1, x0, y0
+        dx = x1 - x0
+        dy = y1 - y0
+        if dy >= 0 and dy <= dx:
+            # 0<=k<=1
+            y = y0
+            p = 2*dy - dx
+            for x in range(x0, x1 + 1):
+                result.append([x, y])
+                if p < 0:
+                    p = p + 2*dy
+                else:
+                    p = p + 2*dy - 2*dx
+                    y = y + 1
+        elif dy <= 0 and -dy <= dx:
+            # -1<=k<=0
+            # need to add a minus before dy
+            y = y0
+            p = 2*(-dy)-dx
+            for x in range(x0, x1 + 1):
+                result.append([x, y])
+                if p < 0:
+                    p = p + 2*(-dy)
+                else:
+                    p = p + 2*(-dy) - 2*dx
+                    y = y - 1
+        elif dy >= 0 and dy > dx:
+            # k > 1
+            x = x0
+            p = 2*dx - dy
+            for y in range(y0, y1 + 1):
+                result.append([x, y])
+                if p < 0:
+                    p = p + 2*dx
+                else:
+                    p = p + 2*dx - 2*dy
+                    x = x + 1
+        elif dy <= 0 and -dy > dx:
+            # k < -1
+            # need to add a minus before dy
+            x = x1
+            p = 2*dx - (-dy)
+            for y in range(y1, y0 + 1):
+                result.append([x, y])
+                if p < 0:
+                    p = p + 2*dx
+                else:
+                    p = p + 2*dx - 2*(-dy)
+                    x = x - 1
     return result
 
 
