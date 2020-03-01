@@ -225,6 +225,9 @@ class MainWindow(QMainWindow):
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
 
+
+
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     mw = MainWindow()

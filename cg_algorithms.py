@@ -129,7 +129,73 @@ def draw_ellipse(p_list):
     :param p_list: (list of list of int: [[x0, y0], [x1, y1]]) 椭圆的矩形包围框左上角和右下角顶点坐标
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
-    pass
+    x0, y0 = p_list[0]
+    x1, y1 = p_list[1]
+    result = []
+    assert x0 <= x1 and y0 <= y1
+    rx = (x1 - x0)/2
+    ry = (y1 - y0)/2
+    xc, yc = int((x1 + x0)/2), int((y1 + y0)/2)
+    print(rx,ry,xc,yc)
+    if(rx >= ry):
+        x, y = 0, int(ry)
+        p1 = ry*ry - rx*rx*ry + rx*rx/4
+        while 2*ry*ry*x < 2*rx*rx*y:
+            # still in area one
+            result.append([x + xc, y + yc])
+            if p1 < 0:
+                x = x + 1
+                p1 = p1 + 2*ry*ry*x + ry*ry
+            else:
+                x = x + 1
+                y = y - 1
+                p1 = p1 + 2*ry*ry*x - 2*rx*rx*y + ry*ry
+        p2 = ry*ry*(x+1/2)*(x+1/2) + rx*rx*(y-1)*(y-1) - rx*rx*ry*ry
+        while x != rx or y != 0:
+            # area two
+            result.append([x + xc, y + yc])
+            if p2 > 0:
+                y = y - 1
+                p2 = p2 - 2*rx*rx*y + rx*rx
+            else:
+                x = x + 1
+                y = y - 1
+                p2 = p2 + 2*ry*ry*x - 2*rx*rx*y + rx*rx
+        result.append([x + xc, y + yc]) # the last one (rx,0)
+    else:
+        x, y = int(rx), 0
+        p1 = rx * rx - ry * ry * rx + ry * ry / 4
+        while 2 * rx * rx * y < 2 * ry * ry * x:
+            # still in area one
+            result.append([x + xc, y + yc])
+            if p1 < 0:
+                y = y + 1
+                p1 = p1 + 2 * rx * rx * y + rx * rx
+            else:
+                y = y + 1
+                x = x - 1
+                p1 = p1 + 2 * rx * rx * y - 2 * ry * ry * x + rx * rx
+        p2 = rx * rx * (y + 1 / 2) * (y + 1 / 2) + ry * ry * (x - 1) * (x - 1) - ry * ry * rx * rx
+        while y != ry or x != 0:
+            # area two
+            result.append([x + xc, y + yc])
+            if p2 > 0:
+                x = x - 1
+                p2 = p2 - 2 * ry * ry * x + ry * ry
+            else:
+                y = y + 1
+                x = x - 1
+                p2 = p2 + 2 * rx * rx * y - 2 * ry * ry * x + ry * ry
+        result.append([x + xc, y + yc])  # the last one (rx,0)
+
+    # Symmetry
+    tmp = result.copy()
+    for p in tmp:
+        xx, yy = p[0] - xc, p[1] - yc
+        result.append([xx + xc, -yy + yc])
+        result.append([-xx + xc, -yy + yc])
+        result.append([-xx + xc, yy + yc])
+    return result
 
 
 def draw_curve(p_list, algorithm):
