@@ -198,6 +198,29 @@ def draw_ellipse(p_list):
     return result
 
 
+def get_bino_coe(k ,n):
+    # get C_n^k
+    C = {}
+    for row in range(n+1):
+        for col in range(k+1):
+            C[row,col] = C.setdefault((row,col),0)
+    for row in range(n+1):
+        C[row,0] = 1
+        for col in range(1,k+1):
+            if col <= row:
+                C[row,col] = C[row-1,col-1]+C[row-1,col]
+    return C[n,k]
+
+
+def get_curve_points(t, points):
+    x, y = 0,0
+    n = len(points)
+    for k in range(0, n):
+        coefficient = get_bino_coe(k, n - 1)* (t**k) * ((1-t)**(n-1-k))
+        x = x + points[k][0] * coefficient
+        y = y + points[k][1] * coefficient
+    return [int(x), int(y)]
+
 def draw_curve(p_list, algorithm):
     """绘制曲线
 
@@ -205,7 +228,14 @@ def draw_curve(p_list, algorithm):
     :param algorithm: (string) 绘制使用的算法，包括'Bezier'和'B-spline'（三次均匀B样条曲线，曲线不必经过首末控制点）
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
-    pass
+    result = []
+    if algorithm == 'Bezier':
+        m = 1000 #number of points
+        for i in range(0,m+1):
+            result.append(get_curve_points( float(i)/float(m), p_list ))
+    elif algorithm == 'B-spline':
+        pass
+    return result
 
 
 def translate(p_list, dx, dy):
