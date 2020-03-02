@@ -1,4 +1,9 @@
 resetCanvas 600 600
-setColor 255 0 0
-drawCurve C1 300 100 400 500 500 100 Bezier
+setColor 0 0 0
+drawLine l1 100 100 200 400 DDA
+drawLine l2 200 400 300 400 DDA
+drawLine l3 300 400 400 100 DDA
+drawLine l4 100 100 400 100 DDA
+setColor 0 0 255
+drawCurve C2 100 100 200 400 300 400 400 100 B-spline
 saveCanvas 1

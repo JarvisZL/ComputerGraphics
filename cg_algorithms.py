@@ -37,25 +37,33 @@ def draw_line(p_list, algorithm):
                 y = y + 1
                 dis = dis -1
         else: # k存在
+            # 保证x1 >= x0 方便后续操作
             if x0 > x1:
                 x0, y0, x1, y1 = x1, y1, x0, y0
+            # 计算出k
             k = (y1 - y0) / (x1 - x0)
             if k <= 1 and k >= -1:
+                # x变化更大，故以x增量为步长
                 y = y0
                 for x in range(x0, x1 + 1):
                     result.append([x,int(y+0.5)])
                     y = y + k
             elif k > 1:
+                # y变化更大，故以y增量为步长
                 x = x0
                 for y in range(y0, y1 + 1):
                     result.append([int(x+0.5),y])
                     x = x + 1/k
             elif k < -1:
+                # y变化更大，故以y增量为步长,且此时y1 < y0
                 x = x1 #match the range
                 for y in range(y1, y0 + 1):
                     result.append([int(x+0.5),y])
                     x = x + 1/k
     elif algorithm == 'Bresenham':
+        # 根据斜率确定以x或者y的增量为步长，假设为x,由此可以确定当(xk,yk)确定后，
+        # (x_{k+1},y_{k+1})情况有(xk+1,yk),(xk+1,yk+1)两种
+        # 随后根据判别式来判断取哪一个值
         if x0 > x1:
             x0, y0, x1, y1 = x1, y1, x0, y0
         dx = x1 - x0
@@ -198,8 +206,10 @@ def draw_ellipse(p_list):
     return result
 
 
+
 def get_bino_coe(k ,n):
-    # get C_n^k
+    """ #C_n^k
+    """
     C = {}
     for row in range(n+1):
         for col in range(k+1):
@@ -208,18 +218,47 @@ def get_bino_coe(k ,n):
         C[row,0] = 1
         for col in range(1,k+1):
             if col <= row:
+                #C_n^k = C_{n-1}^{k-1} + C_{n-1}^k
                 C[row,col] = C[row-1,col-1]+C[row-1,col]
     return C[n,k]
-
-
-def get_curve_points(t, points):
+def get_curve_points_Bezier(t, points):
+    """ #求每一个t对应的点
+    :param t:基函数自变量
+    :param points: 控制点
+    :return 对应的像素点
+    """
     x, y = 0,0
     n = len(points)
+    #求P(t) = sum_{i = 0}^{n} binom_k^{n-1} * t^k *(1-t)^{n-1-k} * P_i
     for k in range(0, n):
         coefficient = get_bino_coe(k, n - 1)* (t**k) * ((1-t)**(n-1-k))
         x = x + points[k][0] * coefficient
         y = y + points[k][1] * coefficient
     return [int(x), int(y)]
+
+
+def get_Ncoefficent(u,i,k,n):
+    """ 求N系数
+    :param i: u 所对应的下界下标(int(u))
+    :param k: 3(3次4阶)
+    :param n: 一共有n+1个控制点(0,1,...,n)
+    :return N: N系数矩阵
+    """
+    # 最大需要计算N[n,k+1],根据递推式可知需要N[n+1,k],N[n+2,k-1],...,N[n+k,1]
+    N = {}
+    # 初始化最多n+k行k+1列,全部为0
+    for row in range(n+k+1):
+        for col in range(1,k+2):
+            N[row,col] = N.setdefault((row,col),0)
+    # N_{uInt,1}(u) = 1 其它为0
+    N[i,1] = 1
+    #递推求解, 因为每一列所需要的行数不同，所以这里由列数来作为外循环控制行数
+    for col in range(2,k+2):
+        # 当列数为col时，其最多需要算到N[(k+1-col)+n,col]
+        for row in range(n+2+(k-col)):
+            N[row, col] = ((u - row) / (col - 1)) * N[row, col - 1] + ((row + col - u) / (col - 1)) * N[row + 1, col - 1]
+
+    return N
 
 def draw_curve(p_list, algorithm):
     """绘制曲线
@@ -230,11 +269,27 @@ def draw_curve(p_list, algorithm):
     """
     result = []
     if algorithm == 'Bezier':
-        m = 1000 #number of points
+        m = 1000 #所取的点数
         for i in range(0,m+1):
-            result.append(get_curve_points( float(i)/float(m), p_list ))
+            result.append(get_curve_points_Bezier( float(i)/float(m), p_list ))
     elif algorithm == 'B-spline':
-        pass
+        k = 3 #三次均匀B样条 k = 3
+        n = len(p_list) - 1 # 一共有n+1个控制点[0,...,n]
+        # 参数点集 = [0,1,2,...,k + n, k + n + 1 ], 共n+k+2个
+        u = k # u可取的区间为[k,n+1]
+        ujump = 0.0001 # 步长
+        while u <= n + 1:
+            uInt = int(u) # u对应的下标
+
+            N = get_Ncoefficent(u, uInt, k, n)
+            # sum_{i = 0}^{n} P_i N[i,k+1](u), 实际上最大的为N[n,k+1]
+            x, y = 0, 0
+            for index in range(n + 1):
+                x = x + p_list[index][0] * N[index, k + 1]
+                y = y + p_list[index][1] * N[index, k + 1]
+            result.append([int(x), int(y)])
+            u = u + ujump
+
     return result
 
 
