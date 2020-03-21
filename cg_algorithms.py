@@ -144,7 +144,6 @@ def draw_ellipse(p_list):
     rx = (x1 - x0)/2
     ry = (y1 - y0)/2
     xc, yc = int((x1 + x0)/2), int((y1 + y0)/2)
-    print(rx,ry,xc,yc)
     if(rx >= ry):
         x, y = 0, int(ry)
         p1 = ry*ry - rx*rx*ry + rx*rx/4

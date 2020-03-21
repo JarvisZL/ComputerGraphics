@@ -3,6 +3,7 @@
 
 import sys
 import os
+import math
 import cg_algorithms as alg
 import numpy as np
 from PIL import Image
@@ -62,7 +63,6 @@ if __name__ == '__main__':
             elif line[0] == 'drawPolygon':
                 item_id = line[1]
                 length = len(line)
-                print(length)
                 algorithm = line[length - 1]
                 plist = []
                 for i in range(2,length - 1):
@@ -85,6 +85,32 @@ if __name__ == '__main__':
                     if i % 2 == 1:
                         plist.append([int(line[i - 1]), int(line[i])])
                 item_dict[item_id] = ['curve', plist, algorithm, np.array(pen_color)]
+            elif line[0] == 'translate':
+                plist = []
+                for x,y in item_dict[line[1]][1]:
+                    plist.append([x + int(line[2]),y + int(line[3])])
+                item_dict[line[1]][1] = plist
+            elif line[0] == 'rotate':
+                # 椭圆不需要旋转
+                if item_dict[line[1]][0] == 'ellipse':
+                    line = fp.readline()
+                    continue
+                plist = []
+                xr,yr,r = int(line[2]),int(line[3]),int(line[4])
+                for x,y in item_dict[line[1]][1]:
+                    # 如果相对画布，则为r此时正好镜面，如果相对坐标系则为-r
+                    xx = xr + (x-xr)*math.cos(-r/180*math.pi) - (y-yr)*math.sin(-r/180*math.pi)
+                    yy = yr + (x-xr)*math.sin(-r/180*math.pi) + (y-yr)*math.cos(-r/180*math.pi)
+                    plist.append([int(xx),int(yy)])
+                item_dict[line[1]][1] = plist
+            elif line[0] == 'scale':
+                plist = []
+                xf,yf,s = int(line[2]),int(line[3]),float(line[4])
+                for x,y in item_dict[line[1]][1]:
+                    xx = x*s + xf*(1-s)
+                    yy = y*s + yf*(1-s)
+                    plist.append([int(xx),int(yy)])
+                item_dict[line[1]][1] = plist
             ...
 
             line = fp.readline()
