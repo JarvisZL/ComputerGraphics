@@ -13,3 +13,6 @@ scale Pol1 250 250 2
 scale C1 0 0 0.5
 scale e1 150 125 3
 saveCanvas 2
+resetCanvas 600 600
+drawLine l1 400 100 200 100 DDA
+saveCanvas 3
