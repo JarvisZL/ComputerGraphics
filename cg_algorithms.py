@@ -338,6 +338,20 @@ def scale(p_list, x, y, s):
     return ret
 
 
+def Encode(point,x_min, y_min, x_max, y_max):
+    LEFT,RIGHT,UP,BOTTOM = 1,2,4,8
+    x,y = point[0],point[1]
+    ret = 0
+    if x < x_min:
+        ret = ret | LEFT
+    elif x > x_max:
+        ret = ret | RIGHT
+    if y < y_min:
+        ret = ret | BOTTOM
+    elif y > y_max:
+        ret = ret | UP
+    return ret
+
 def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
     """线段裁剪
 
@@ -349,4 +363,93 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
     :param algorithm: (string) 使用的裁剪算法，包括'Cohen-Sutherland'和'Liang-Barsky'
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1]]) 裁剪后线段的起点和终点坐标
     """
-    pass
+    result = []
+    if algorithm == 'Cohen-Sutherland':
+        LEFT, RIGHT, UP, BOTTOM = 1, 2, 4, 8
+        code1 = Encode(p_list[0], x_min, y_min, x_max, y_max)
+        code2 = Encode(p_list[1], x_min, y_min, x_max, y_max)
+        x1,y1,x2,y2 = p_list[0][0],p_list[0][1],p_list[1][0],p_list[1][1]
+        xx1,yy1,xx2,yy2 = x1,y1,x2,y2
+
+        if code1 != 0 or code2 != 0 :
+            if (code1 & code2) != 0:
+                return result
+            else:
+                while(code1 != 0):
+                    if (code1 & LEFT) != 0:
+                        k = (y2 - y1) / (x2 - x1)
+                        yy1 = y1 + k*(x_min - x1)
+                        xx1 = x_min
+                    elif (code1 & RIGHT) != 0:
+                        k = (y2 - y1) / (x2 - x1)
+                        yy1 = y1 + k * (x_max - x1)
+                        xx1 = x_max
+                    elif (code1 & UP) != 0:
+                        if x1 == x2:
+                            xx1 = x1
+                        else:
+                            k = (y2 - y1) / (x2 - x1)
+                            xx1 = x1 + (y_max - y1) / k
+                        yy1 = y_max
+                    elif (code1 & BOTTOM) != 0:
+                        if x1 == x2:
+                            xx1 = x1
+                        else:
+                            k = (y2 - y1) / (x2 - x1)
+                            xx1 = x1 + (y_min - y1) / k
+                        yy1 = y_min
+                    code1 = Encode([xx1,yy1], x_min, y_min, x_max, y_max)
+                while(code2 != 0):
+                    if (code2 & LEFT) != 0:
+                        k = (y2 - y1) / (x2 - x1)
+                        yy2 = y1 + k * (x_min - x1)
+                        xx2 = x_min
+                    elif (code2 & RIGHT) != 0:
+                        k = (y2 - y1) / (x2 - x1)
+                        yy2 = y1 + k * (x_max - x1)
+                        xx2 = x_max
+                    elif (code2 & UP) != 0:
+                        if x1 == x2:
+                            xx2 = x1
+                        else:
+                            k = (y2 - y1) / (x2 - x1)
+                            xx2 = x1 + (y_max - y1) / k
+                        yy2 = y_max
+                    elif (code2 & BOTTOM) != 0:
+                        if x1 == x2:
+                            xx2 = x1
+                        else:
+                            k = (y2 - y1) / (x2 - x1)
+                            xx2 = x1 + (y_min - y1) / k
+                        yy2 = y_min
+                    code2 = Encode([xx2, yy2], x_min, y_min, x_max, y_max)
+        result.append([int(xx1),int(yy1)])
+        result.append([int(xx2), int(yy2)])
+        return result
+    elif algorithm == 'Liang-Barsky':
+        x1, y1, x2, y2 = p_list[0][0], p_list[0][1], p_list[1][0], p_list[1][1]
+        dx = x2 - x1
+        dy = y2 - y1
+        p = [-dx, dx, -dy, dy]
+        q = [x1 - x_min, x_max - x1, y1 - y_min, y_max - y1]
+        u1,u2 = 0,1
+        for i in range(4):
+            if p[i] < 0:
+                r = q[i] / p[i]
+                u1 = max(u1, r)
+            elif p[i] > 0:
+                r = q[i] / p[i]
+                u2 = min(u2, r)
+            else:
+                if q[i] < 0:
+                    return []
+
+        xx1 = x1 + u1*(x2 - x1)
+        yy1 = y1 + u1*(y2 - y1)
+        xx2 = x1 + u2*(x2 - x1)
+        yy2 = y1 + u2*(y2 - y1)
+        result.append([int(xx1),int(yy1)])
+        result.append([int(xx2),int(yy2)])
+        return result
+
+

@@ -24,7 +24,7 @@ if __name__ == '__main__':
         while line:
             line = line.strip().split(' ')
             if line[0] == 'resetCanvas':
-                item_dict = {}
+                item_dict.clear()
                 width = int(line[1])
                 height = int(line[2])
             elif line[0] == 'saveCanvas':
@@ -99,6 +99,12 @@ if __name__ == '__main__':
             elif line[0] == 'scale':
                 plist = alg.scale(item_dict[line[1]][1],int(line[2]),int(line[3]),float(line[4]))
                 item_dict[line[1]][1] = plist
+            elif line[0] == 'clip':
+                plist = alg.clip(item_dict[line[1]][1],int(line[2]),int(line[3]),int(line[4]),int(line[5]),line[6])
+                if plist == []:
+                    del item_dict[line[1]]
+                else:
+                    item_dict[line[1]][1] = plist
             ...
 
             line = fp.readline()
