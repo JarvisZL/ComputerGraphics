@@ -321,7 +321,6 @@ def rotate(p_list, x, y, r):
         ret.append([int(xx),int(yy)])
     return ret
 
-
 def scale(p_list, x, y, s):
     """缩放变换
 
