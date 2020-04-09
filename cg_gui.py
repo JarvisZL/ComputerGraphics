@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QHBoxLayout,
     QWidget,
-    QStyleOptionGraphicsItem)
+    QStyleOptionGraphicsItem, QColorDialog, QInputDialog)
 from PyQt5.QtGui import QPainter, QMouseEvent, QColor
 from PyQt5.QtCore import QRectF
 
@@ -23,12 +23,14 @@ class MyCanvas(QGraphicsView):
     """
     画布窗体类，继承自QGraphicsView，采用QGraphicsView、QGraphicsScene、QGraphicsItem的绘图框架
     """
+
     def __init__(self, *args):
         super().__init__(*args)
         self.main_window = None
         self.list_widget = None
         self.item_dict = {}
         self.selected_id = ''
+        self.color = QColor(0, 0, 0)
 
         self.status = ''
         self.temp_algorithm = ''
@@ -55,16 +57,16 @@ class MyCanvas(QGraphicsView):
             self.item_dict[self.selected_id].update()
         self.selected_id = selected
         self.item_dict[selected].selected = True
-        self.item_dict[selected].update()
+        self.item_dict[selected].update()  # 调用paint
         self.status = ''
-        self.updateScene([self.sceneRect()])
+        self.updateScene([self.sceneRect()])  # 调用paint
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         pos = self.mapToScene(event.localPos().toPoint())
         x = int(pos.x())
         y = int(pos.y())
         if self.status == 'line':
-            self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.temp_algorithm)
+            self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
             self.scene().addItem(self.temp_item)
         self.updateScene([self.sceneRect()])
         super().mousePressEvent(event)
@@ -85,24 +87,38 @@ class MyCanvas(QGraphicsView):
             self.finish_draw()
         super().mouseReleaseEvent(event)
 
+    def resetcanvas(self):
+        self.item_dict.clear()
+        self.selected_id = ''
+        self.status = ''
+        self.temp_algorithm = ''
+        self.temp_id = ''
+        self.temp_item = None
+        for item in self.scene().items():
+            self.scene().removeItem(item)
+
 
 class MyItem(QGraphicsItem):
     """
     自定义图元类，继承自QGraphicsItem
     """
-    def __init__(self, item_id: str, item_type: str, p_list: list, algorithm: str = '', parent: QGraphicsItem = None):
+
+    def __init__(self, item_id: str, item_type: str, p_list: list, color: QColor, algorithm: str = '',
+                 parent: QGraphicsItem = None):
         """
 
         :param item_id: 图元ID
         :param item_type: 图元类型，'line'、'polygon'、'ellipse'、'curve'等
         :param p_list: 图元参数
         :param algorithm: 绘制算法，'DDA'、'Bresenham'、'Bezier'、'B-spline'等
+        :param color: 画笔颜色
         :param parent:
         """
         super().__init__(parent)
-        self.id = item_id           # 图元ID
+        self.id = item_id  # 图元ID
         self.item_type = item_type  # 图元类型，'line'、'polygon'、'ellipse'、'curve'等
-        self.p_list = p_list        # 图元参数
+        self.p_list = p_list  # 图元参数
+        self.color = color  # 画笔颜色
         self.algorithm = algorithm  # 绘制算法，'DDA'、'Bresenham'、'Bezier'、'B-spline'等
         self.selected = False
 
@@ -110,6 +126,7 @@ class MyItem(QGraphicsItem):
         if self.item_type == 'line':
             item_pixels = alg.draw_line(self.p_list, self.algorithm)
             for p in item_pixels:
+                painter.setPen(self.color)
                 painter.drawPoint(*p)
             if self.selected:
                 painter.setPen(QColor(255, 0, 0))
@@ -142,6 +159,7 @@ class MainWindow(QMainWindow):
     """
     主窗口类
     """
+
     def __init__(self):
         super().__init__()
         self.item_cnt = 0
@@ -186,6 +204,9 @@ class MainWindow(QMainWindow):
 
         # 连接信号和槽函数
         exit_act.triggered.connect(qApp.quit)
+        set_pen_act.triggered.connect(self.set_pen_action)
+        reset_canvas_act.triggered.connect(self.reset_canvas_action)
+
         line_naive_act.triggered.connect(self.line_naive_action)
         line_dda_act.triggered.connect(self.line_dda_action)
         line_bresenham_act.triggered.connect(self.line_bresenham_action)
@@ -207,6 +228,21 @@ class MainWindow(QMainWindow):
         self.item_cnt += 1
         return _id
 
+    # 文件目录操作
+    def set_pen_action(self):
+        self.canvas_widget.color = QColorDialog.getColor()
+        self.statusBar().showMessage('设置画笔颜色')
+
+    def reset_canvas_action(self):
+        self.list_widget.clear()
+        self.item_cnt = 0
+        text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width,height')
+        if ok:
+            text = text.strip().split(',')
+            self.canvas_widget.setFixedSize(int(text[0]), int(text[1]))
+        self.canvas_widget.resetcanvas()
+        self.statusBar().showMessage('重置画布')
+
     def line_naive_action(self):
         self.canvas_widget.start_draw_line('Naive', self.get_id())
         self.statusBar().showMessage('Naive算法绘制线段')
@@ -214,18 +250,16 @@ class MainWindow(QMainWindow):
         self.canvas_widget.clear_selection()
 
     def line_dda_action(self):
-        self.canvas_widget.start_draw_line('DDA',self.get_id())
+        self.canvas_widget.start_draw_line('DDA', self.get_id())
         self.statusBar().showMessage('DDA算法绘制线段')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
 
     def line_bresenham_action(self):
-        self.canvas_widget.start_draw_line('Bresenham',self.get_id())
+        self.canvas_widget.start_draw_line('Bresenham', self.get_id())
         self.statusBar().showMessage('Bresenham算法绘制线段')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
-
-
 
 
 if __name__ == '__main__':
