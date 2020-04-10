@@ -2,6 +2,7 @@
 # -*- coding:utf-8 -*-
 
 import sys
+import os
 import cg_algorithms as alg
 from typing import Optional
 from PyQt5.QtWidgets import (
@@ -14,9 +15,9 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QHBoxLayout,
     QWidget,
-    QStyleOptionGraphicsItem, QColorDialog, QInputDialog)
+    QStyleOptionGraphicsItem, QColorDialog, QInputDialog, QFileDialog)
 from PyQt5.QtGui import QPainter, QMouseEvent, QColor
-from PyQt5.QtCore import QRectF
+from PyQt5.QtCore import QRectF, QRect
 
 
 class MyCanvas(QGraphicsView):
@@ -172,7 +173,7 @@ class MainWindow(QMainWindow):
         self.scene = QGraphicsScene(self)
         self.scene.setSceneRect(0, 0, 600, 600)
         self.canvas_widget = MyCanvas(self.scene, self)
-        self.canvas_widget.setFixedSize(600, 600)
+        self.canvas_widget.setFixedSize(605, 605)
         self.canvas_widget.main_window = self
         self.canvas_widget.list_widget = self.list_widget
 
@@ -181,6 +182,7 @@ class MainWindow(QMainWindow):
         file_menu = menubar.addMenu('文件')
         set_pen_act = file_menu.addAction('设置画笔')
         reset_canvas_act = file_menu.addAction('重置画布')
+        save_canvas_act = file_menu.addAction('保存画布')
         exit_act = file_menu.addAction('退出')
         draw_menu = menubar.addMenu('绘制')
         line_menu = draw_menu.addMenu('线段')
@@ -206,6 +208,7 @@ class MainWindow(QMainWindow):
         exit_act.triggered.connect(qApp.quit)
         set_pen_act.triggered.connect(self.set_pen_action)
         reset_canvas_act.triggered.connect(self.reset_canvas_action)
+        save_canvas_act.triggered.connect(self.save_canvas_action)
 
         line_naive_act.triggered.connect(self.line_naive_action)
         line_dda_act.triggered.connect(self.line_dda_action)
@@ -236,13 +239,22 @@ class MainWindow(QMainWindow):
     def reset_canvas_action(self):
         self.list_widget.clear()
         self.item_cnt = 0
-        text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width,height')
+        text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width height')
         if ok:
-            text = text.strip().split(',')
-            self.canvas_widget.setFixedSize(int(text[0]), int(text[1]))
+            text = text.strip().split(' ')
+            self.canvas_widget.setFixedSize(int(text[0])+5, int(text[1])+5)
+            self.scene.setSceneRect(0, 0, int(text[0]), int(text[1]))
         self.canvas_widget.resetcanvas()
         self.statusBar().showMessage('重置画布')
 
+    def save_canvas_action(self):
+        filename,options = QFileDialog.getSaveFileName(self,"Save Image",os.getcwd()+"/GuiImg/","Images (*.png *.jpg *.bmp)")
+        if filename != '':
+            pixMap = self.canvas_widget.grab()
+            pixMap.save(filename)
+        self.statusBar().showMessage('保存图片: '+filename)
+
+    #绘制目录操作
     def line_naive_action(self):
         self.canvas_widget.start_draw_line('Naive', self.get_id())
         self.statusBar().showMessage('Naive算法绘制线段')
