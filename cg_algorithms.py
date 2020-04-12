@@ -116,6 +116,17 @@ def draw_line(p_list, algorithm):
                     x = x - 1
     return result
 
+def draw_multilines(p_list, algorithm):
+    """ 用于GUI绘制多边形过程
+    :param p_list: (list of list of int: [[x0, y0], [x1, y1], [x2, y2], ...]) 多边形的顶点坐标列表
+    :param algorithm: (string) 绘制使用的算法，包括'DDA'和'Bresenham'
+    :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
+    """
+    result = []
+    for i in range(1, len(p_list)):
+        line = draw_line([p_list[i - 1], p_list[i]], algorithm)
+        result += line
+    return result
 
 def draw_polygon(p_list, algorithm):
     """绘制多边形
