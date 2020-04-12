@@ -148,10 +148,15 @@ def draw_ellipse(p_list):
     :param p_list: (list of list of int: [[x0, y0], [x1, y1]]) 椭圆的矩形包围框左上角和右下角顶点坐标
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
+    print("Call ellipse")
     x0, y0 = p_list[0]
     x1, y1 = p_list[1]
     result = []
-    assert x0 <= x1 and y0 <= y1
+    if y1 - y0 < 10:
+        y1 = y0 + 10
+    if x1 - x0 < 10:
+        x1 = x0 + 10
+    assert x0 < x1 and y0 < y1
     rx = (x1 - x0)/2
     ry = (y1 - y0)/2
     xc, yc = int((x1 + x0)/2), int((y1 + y0)/2)
@@ -169,7 +174,7 @@ def draw_ellipse(p_list):
                 y = y - 1
                 p1 = p1 + 2*ry*ry*x - 2*rx*rx*y + ry*ry
         p2 = ry*ry*(x+1/2)*(x+1/2) + rx*rx*(y-1)*(y-1) - rx*rx*ry*ry
-        while x != rx or y != 0:
+        while x != int(rx) and y != 0:
             # area two
             result.append([x + xc, y + yc])
             if p2 > 0:
@@ -194,7 +199,7 @@ def draw_ellipse(p_list):
                 x = x - 1
                 p1 = p1 + 2 * rx * rx * y - 2 * ry * ry * x + rx * rx
         p2 = rx * rx * (y + 1 / 2) * (y + 1 / 2) + ry * ry * (x - 1) * (x - 1) - ry * ry * rx * rx
-        while y != ry or x != 0:
+        while y != int(ry) and x != 0:
             # area two
             result.append([x + xc, y + yc])
             if p2 > 0:
@@ -213,6 +218,8 @@ def draw_ellipse(p_list):
         result.append([xx + xc, -yy + yc])
         result.append([-xx + xc, -yy + yc])
         result.append([-xx + xc, yy + yc])
+
+    print("ellipse return")
     return result
 
 

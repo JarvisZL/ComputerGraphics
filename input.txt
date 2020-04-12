@@ -1,5 +1,4 @@
 resetCanvas 600 500
 setColor 0 0 0
-drawLine l1 10 10 20 20 DDA
-drawLine l2 20 10 20 15 DDA
+drawEllipse e0 258 78 264 524
 saveCanvas 8

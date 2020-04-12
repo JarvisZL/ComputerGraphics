@@ -51,6 +51,10 @@ class MyCanvas(QGraphicsView):
         self.temp_algorithm = algorithm
         self.temp_id = item_id
 
+    def start_draw_ellipse(self, item_id):
+        self.status = 'ellipse'
+        self.temp_id = item_id
+
     # 绘制结束
     def finish_draw(self):
         self.temp_id = self.main_window.get_id()
@@ -95,6 +99,11 @@ class MyCanvas(QGraphicsView):
             else:
                 self.polyedgenum = self.polyedgenum + 1
                 self.temp_item.p_list.append([x, y])
+        elif self.status == 'ellipse':
+            self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color)
+            print(x,y)
+            self.scene().addItem(self.temp_item)
+
         self.updateScene([self.sceneRect()])
         super().mousePressEvent(event)
 
@@ -110,6 +119,10 @@ class MyCanvas(QGraphicsView):
             self.temp_item.p_list[1] = [x, y]
         elif self.status == 'otherpolygon':
             self.temp_item.p_list[self.polyedgenum] = [x, y]
+        elif self.status == 'ellipse':
+            self.temp_item.p_list[1] = [x, y]
+            print(x,y)
+
         self.updateScene([self.sceneRect()])
         super().mouseMoveEvent(event)
 
@@ -135,6 +148,10 @@ class MyCanvas(QGraphicsView):
                 self.item_dict[self.temp_id] = self.temp_item
                 self.list_widget.addItem(self.temp_id)
                 self.finish_draw()
+        elif self.status == 'ellipse':
+            self.item_dict[self.temp_id] = self.temp_item
+            self.list_widget.addItem(self.temp_id)
+            self.finish_draw()
 
         super().mouseReleaseEvent(event)
 
@@ -146,6 +163,9 @@ class MyCanvas(QGraphicsView):
         self.temp_algorithm = ''
         self.temp_id = ''
         self.temp_item = None
+        self.color = QColor(0,0,0)
+        self.polypainting = False
+        self.polyedgenum = 0
         for item in self.scene().items():
             self.scene().removeItem(item)
 
@@ -222,9 +242,21 @@ class MyItem(QGraphicsItem):
                 painter.setPen(QColor(255, 0, 0))
                 painter.drawRect(self.boundingRect())
         elif self.item_type == 'ellipse':
-            pass
+            x0, y0 = self.p_list[0]
+            x1, y1 = self.p_list[1]
+            plist = []
+            plist.append([min(x0, x1), min(y0, y1)])
+            plist.append([max(x0, x1), max(y0, y1)])
+            item_pixels = alg.draw_ellipse(plist)
+            for p in item_pixels:
+                painter.setPen(self.color)
+                print(*p)
+                painter.drawPoint(*p)
+            if self.selected:
+                painter.setPen(QColor(255, 0, 0))
+                painter.drawRect(self.boundingRect())
         elif self.item_type == 'curve':
-            pass
+            print('curve')
 
     def boundingRect(self) -> QRectF:
         if self.item_type == 'line':
@@ -261,7 +293,13 @@ class MyItem(QGraphicsItem):
                 y_max = max(y_max, y)
             return QRectF(x_min - 1, y_min - 1, x_max - x_min + 2, y_max - y_min + 2)
         elif self.item_type == 'ellipse':
-            pass
+            x0, y0 = self.p_list[0]
+            x1, y1 = self.p_list[1]
+            x = min(x0, x1)
+            y = min(y0, y1)
+            w = max(x0, x1) - x
+            h = max(y0, y1) - y
+            return QRectF(x - 1, y - 1, w + 2, h + 2)
         elif self.item_type == 'curve':
             pass
 
@@ -342,6 +380,8 @@ class MainWindow(QMainWindow):
         rectangle_bresenham_act.triggered.connect(self.rectangle_bresenham_action)
         otherpolygon_dda_act.triggered.connect(self.otherpolygon_dda_action)
         otherpolygon_bresenham_act.triggered.connect(self.otherpolygon_bresenham_action)
+        #绘制目录 - 椭圆
+        ellipse_act.triggered.connect(self.ellipse_action)
 
         self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
 
@@ -439,6 +479,14 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage('Bresenham算法绘制自定义多边形')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+
+    # 绘制目录操作 - 椭圆
+    def ellipse_action(self):
+        self.canvas_widget.start_draw_ellipse(self.get_id())
+        self.statusBar().showMessage('绘制椭圆')
+        self.list_widget.clearSelection()
+        self.canvas_widget.clear_selection()
+
 
 
 if __name__ == '__main__':
