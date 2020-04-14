@@ -1,4 +1,17 @@
-resetCanvas 600 500
+resetCanvas 600 600
+setColor 0 255 0
+drawCurve C0 100 100 200 200 B-spline
 setColor 0 0 0
-drawEllipse e0 258 78 264 524
-saveCanvas 8
+drawLine l0 300 100 400 500 DDA
+drawLine l1 400 500 500 100 DDA
+drawLine l2 300 100 500 100 DDA
+setColor 255 0 0
+drawCurve C1 300 100 400 500 500 100 B-spline
+setColor 0 0 0
+drawLine l3 200 400 300 500 DDA
+drawLine l4 300 500 400 400 DDA
+drawLine l5 400 400 500 500 DDA
+drawLine l6 200 400 500 500 DDA
+setColor 0 0 255
+drawCurve C2 200 400 300 500 400 400 500 500 B-spline
+saveCanvas 1

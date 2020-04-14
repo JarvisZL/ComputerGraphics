@@ -37,8 +37,8 @@ class MyCanvas(QGraphicsView):
         self.temp_id = ''
         self.temp_item = None
         self.color = QColor(0, 0, 0)
-        self.polypainting = False
-        self.polyedgenum = 0
+        self.painting = False # 多边形和曲线绘制过程中控制
+        self.edgenum = 0 # 多边形和曲线绘制过程中控制
 
     # 开始绘制操作
     def start_draw_line(self, algorithm, item_id):
@@ -55,10 +55,16 @@ class MyCanvas(QGraphicsView):
         self.status = 'ellipse'
         self.temp_id = item_id
 
+    def start_draw_curve(self, algorithm, item_id):
+        self.status = 'curve'
+        self.temp_algorithm = algorithm
+        self.temp_id = item_id
+
     # 绘制结束
     def finish_draw(self):
         self.temp_id = self.main_window.get_id()
-        self.polypainting = False
+        self.painting = False
+        self.edgenum = 0
 
     def clear_selection(self):
         if self.selected_id != '':
@@ -91,19 +97,27 @@ class MyCanvas(QGraphicsView):
             self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
             self.scene().addItem(self.temp_item)
         elif self.status == 'otherpolygon':
-            if self.polypainting == False:
+            if self.painting == False:
                 self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
                 self.scene().addItem(self.temp_item)
-                self.polyedgenum = 1
-                self.polypainting = True
+                self.edgenum = 1
+                self.painting = True
             else:
-                self.polyedgenum = self.polyedgenum + 1
+                self.edgenum = self.edgenum + 1
                 self.temp_item.p_list.append([x, y])
         elif self.status == 'ellipse':
             self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color)
             print(x,y)
             self.scene().addItem(self.temp_item)
-
+        elif self.status == 'curve':
+            if self.painting == False:
+                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm, False)
+                self.scene().addItem(self.temp_item)
+                self.edgenum = 1
+                self.painting = True
+            else:
+                self.edgenum = self.edgenum + 1
+                self.temp_item.p_list.append([x, y])
         self.updateScene([self.sceneRect()])
         super().mousePressEvent(event)
 
@@ -118,10 +132,11 @@ class MyCanvas(QGraphicsView):
         elif self.status == 'rectangle':
             self.temp_item.p_list[1] = [x, y]
         elif self.status == 'otherpolygon':
-            self.temp_item.p_list[self.polyedgenum] = [x, y]
+            self.temp_item.p_list[self.edgenum] = [x, y]
         elif self.status == 'ellipse':
             self.temp_item.p_list[1] = [x, y]
-            print(x,y)
+        elif self.status == 'curve':
+            self.temp_item.p_list[self.edgenum] = [x, y]
 
         self.updateScene([self.sceneRect()])
         super().mouseMoveEvent(event)
@@ -140,10 +155,10 @@ class MyCanvas(QGraphicsView):
             self.list_widget.addItem(self.temp_id)
             self.finish_draw()
         elif self.status == 'otherpolygon':
-            xf, yf = self.temp_item.p_list[self.polyedgenum]
+            xf, yf = self.temp_item.p_list[self.edgenum]
             xb, yb = self.temp_item.p_list[0]
             if (xf - xb) ** 2 + (yf - yb) ** 2 <= 25:
-                self.temp_item.p_list[self.polyedgenum] = [xb, yb]
+                self.temp_item.p_list[self.edgenum] = [xb, yb]
                 self.updateScene([self.sceneRect()])
                 self.item_dict[self.temp_id] = self.temp_item
                 self.list_widget.addItem(self.temp_id)
@@ -152,8 +167,19 @@ class MyCanvas(QGraphicsView):
             self.item_dict[self.temp_id] = self.temp_item
             self.list_widget.addItem(self.temp_id)
             self.finish_draw()
+        elif self.status == 'curve':
+            pass
 
         super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        if self.status == 'curve':
+            self.temp_item.curvefinish = True
+            self.item_dict[self.temp_id] = self.temp_item
+            self.list_widget.addItem(self.temp_id)
+            self.finish_draw()
+            self.updateScene([self.sceneRect()])
+
 
 
     def resetcanvas(self):
@@ -164,8 +190,8 @@ class MyCanvas(QGraphicsView):
         self.temp_id = ''
         self.temp_item = None
         self.color = QColor(0,0,0)
-        self.polypainting = False
-        self.polyedgenum = 0
+        self.painting = False
+        self.edgenum = 0
         for item in self.scene().items():
             self.scene().removeItem(item)
 
@@ -175,7 +201,7 @@ class MyItem(QGraphicsItem):
     自定义图元类，继承自QGraphicsItem
     """
 
-    def __init__(self, item_id: str, item_type: str, p_list: list, color: QColor, algorithm: str = '',
+    def __init__(self, item_id: str, item_type: str, p_list: list, color: QColor, algorithm: str = '', curvefinish: bool = False,
                  parent: QGraphicsItem = None):
         """
 
@@ -184,6 +210,7 @@ class MyItem(QGraphicsItem):
         :param p_list: 图元参数
         :param algorithm: 绘制算法，'DDA'、'Bresenham'、'Bezier'、'B-spline'等
         :param color: 画笔颜色
+        :param curvefinish: 标记曲线是否绘制完毕
         :param parent:
         """
         super().__init__(parent)
@@ -193,6 +220,7 @@ class MyItem(QGraphicsItem):
         self.color = color  # 画笔颜色
         self.algorithm = algorithm  # 绘制算法，'DDA'、'Bresenham'、'Bezier'、'B-spline'等
         self.selected = False
+        self.curvefinish = curvefinish
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = ...) -> None:
         if self.item_type == 'line':
@@ -256,7 +284,22 @@ class MyItem(QGraphicsItem):
                 painter.setPen(QColor(255, 0, 0))
                 painter.drawRect(self.boundingRect())
         elif self.item_type == 'curve':
-            print('curve')
+            if self.curvefinish == False:
+                item_pixels = alg.draw_multilines(self.p_list, 'DDA')
+                for p in item_pixels:
+                    painter.setPen(self.color)
+                    painter.drawPoint(*p)
+                if self.selected:
+                    painter.setPen(QColor(255, 0, 0))
+                    painter.drawRect(self.boundingRect())
+            else:
+                item_pixels = alg.draw_curve(self.p_list, self.algorithm)
+                for p in item_pixels:
+                    painter.setPen(self.color)
+                    painter.drawPoint(*p)
+                if self.selected:
+                    painter.setPen(QColor(255, 0, 0))
+                    painter.drawRect(self.boundingRect())
 
     def boundingRect(self) -> QRectF:
         if self.item_type == 'line':
@@ -301,7 +344,14 @@ class MyItem(QGraphicsItem):
             h = max(y0, y1) - y
             return QRectF(x - 1, y - 1, w + 2, h + 2)
         elif self.item_type == 'curve':
-            pass
+            x_min, y_min = self.p_list[0]
+            x_max, y_max = self.p_list[0]
+            for x, y in self.p_list:
+                x_min = min(x_min, x)
+                y_min = min(y_min, y)
+                x_max = max(x_max, x)
+                y_max = max(y_max, y)
+            return QRectF(x_min - 1, y_min - 1, x_max - x_min + 2, y_max - y_min + 2)
 
 
 class MainWindow(QMainWindow):
@@ -311,7 +361,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.item_cnt = 1
+        self.item_cnt = 0
 
         # 使用QListWidget来记录已有的图元，并用于选择图元。注：这是图元选择的简单实现方法，更好的实现是在画布中直接用鼠标选择图元
         self.list_widget = QListWidget(self)
@@ -383,6 +433,11 @@ class MainWindow(QMainWindow):
         #绘制目录 - 椭圆
         ellipse_act.triggered.connect(self.ellipse_action)
 
+        #绘制目录 - 曲线
+        curve_bezier_act.triggered.connect(self.curve_bezier_actiton)
+        curve_b_spline_act.triggered.connect(self.curve_b_spline_action)
+
+        # 选中
         self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
 
         # 设置主窗口的布局
@@ -407,7 +462,9 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage('设置画笔颜色')
 
     def reset_canvas_action(self):
-        self.list_widget.clear()
+        self.list_widget.currentTextChanged.disconnect(self.canvas_widget.selection_changed)
+        self.list_widget.clear() # clear之前必须解除槽函数和信号的connect
+        self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
         self.item_cnt = 0
         text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width height')
         if ok:
@@ -487,7 +544,18 @@ class MainWindow(QMainWindow):
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
 
+    # 绘制目录操作 - 曲线
+    def curve_bezier_actiton(self):
+        self.canvas_widget.start_draw_curve('Bezier',self.get_id())
+        self.statusBar().showMessage('Bezier算法绘制曲线')
+        self.list_widget.clearSelection()
+        self.canvas_widget.clear_selection()
 
+    def curve_b_spline_action(self):
+        self.canvas_widget.start_draw_curve('B-spline',self.get_id())
+        self.statusBar().showMessage('B-spline算法绘制曲线')
+        self.list_widget.clearSelection()
+        self.canvas_widget.clear_selection()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

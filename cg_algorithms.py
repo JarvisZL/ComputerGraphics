@@ -151,21 +151,19 @@ def draw_ellipse(p_list):
     print("Call ellipse")
     x0, y0 = p_list[0]
     x1, y1 = p_list[1]
+    if x0 == x1 or y1 == y0:
+        return draw_line(p_list, 'DDA')
     result = []
-    if y1 - y0 < 10:
-        y1 = y0 + 10
-    if x1 - x0 < 10:
-        x1 = x0 + 10
-    assert x0 < x1 and y0 < y1
+    assert x0 <= x1 and y0 <= y1
     rx = (x1 - x0)/2
     ry = (y1 - y0)/2
-    xc, yc = int((x1 + x0)/2), int((y1 + y0)/2)
+    xc, yc = (x1 + x0)/2, (y1 + y0)/2
     if(rx >= ry):
-        x, y = 0, int(ry)
+        x, y = 0, ry
         p1 = ry*ry - rx*rx*ry + rx*rx/4
         while 2*ry*ry*x < 2*rx*rx*y:
             # still in area one
-            result.append([x + xc, y + yc])
+            result.append([int(x + xc), int(y + yc)])
             if p1 < 0:
                 x = x + 1
                 p1 = p1 + 2*ry*ry*x + ry*ry
@@ -174,9 +172,9 @@ def draw_ellipse(p_list):
                 y = y - 1
                 p1 = p1 + 2*ry*ry*x - 2*rx*rx*y + ry*ry
         p2 = ry*ry*(x+1/2)*(x+1/2) + rx*rx*(y-1)*(y-1) - rx*rx*ry*ry
-        while x != int(rx) and y != 0:
+        while y > 0 :
             # area two
-            result.append([x + xc, y + yc])
+            result.append([int(x + xc), int(y + yc)])
             if p2 > 0:
                 y = y - 1
                 p2 = p2 - 2*rx*rx*y + rx*rx
@@ -184,13 +182,14 @@ def draw_ellipse(p_list):
                 x = x + 1
                 y = y - 1
                 p2 = p2 + 2*ry*ry*x - 2*rx*rx*y + rx*rx
-        result.append([x + xc, y + yc]) # the last one (rx,0)
+        result.append([int(x + xc), int(y + yc)]) # the last one (rx,0)
+        print(int(x + xc))
     else:
-        x, y = int(rx), 0
+        x, y = rx, 0
         p1 = rx * rx - ry * ry * rx + ry * ry / 4
         while 2 * rx * rx * y < 2 * ry * ry * x:
             # still in area one
-            result.append([x + xc, y + yc])
+            result.append([int(x + xc), int(y + yc)])
             if p1 < 0:
                 y = y + 1
                 p1 = p1 + 2 * rx * rx * y + rx * rx
@@ -199,9 +198,9 @@ def draw_ellipse(p_list):
                 x = x - 1
                 p1 = p1 + 2 * rx * rx * y - 2 * ry * ry * x + rx * rx
         p2 = rx * rx * (y + 1 / 2) * (y + 1 / 2) + ry * ry * (x - 1) * (x - 1) - ry * ry * rx * rx
-        while y != int(ry) and x != 0:
+        while x > 0:
             # area two
-            result.append([x + xc, y + yc])
+            result.append([int(x + xc), int(y + yc)])
             if p2 > 0:
                 x = x - 1
                 p2 = p2 - 2 * ry * ry * x + ry * ry
@@ -209,15 +208,16 @@ def draw_ellipse(p_list):
                 y = y + 1
                 x = x - 1
                 p2 = p2 + 2 * rx * rx * y - 2 * ry * ry * x + ry * ry
-        result.append([x + xc, y + yc])  # the last one (rx,0)
+        result.append([int(x + xc), int(y + yc)])  # the last one (rx,0)
+
 
     # Symmetry
     tmp = result.copy()
     for p in tmp:
         xx, yy = p[0] - xc, p[1] - yc
-        result.append([xx + xc, -yy + yc])
-        result.append([-xx + xc, -yy + yc])
-        result.append([-xx + xc, yy + yc])
+        result.append([int(xx + xc), int(-yy + yc)])
+        result.append([int(-xx + xc), int(-yy + yc)])
+        result.append([int(-xx + xc), int(yy + yc)])
 
     print("ellipse return")
     return result
@@ -294,7 +294,7 @@ def draw_curve(p_list, algorithm):
         n = len(p_list) - 1 # 一共有n+1个控制点[0,...,n]
         # 参数点集 = [0,1,2,...,k + n, k + n + 1 ], 共n+k+2个
         u = k # u可取的区间为[k,n+1]
-        ujump = 0.0001 # 步长
+        ujump = 0.001 # 步长
         while u <= n + 1:
             uInt = int(u) # u对应的下标
 
