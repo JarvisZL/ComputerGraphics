@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-
+import copy
 import sys
 import os
-import numpy as np
+import time
+
 import cg_algorithms as alg
 from typing import Optional
 from PyQt5.QtWidgets import (
@@ -43,6 +44,8 @@ class MyCanvas(QGraphicsView):
 
         self.editstatus = ''
         self.editoriginpoint = []
+        self.rotate_angle = 30
+        self.clip_item = None
 
 
     # 开始绘制操作
@@ -95,6 +98,55 @@ class MyCanvas(QGraphicsView):
         self.setMouseTracking(True)
         self.temp_item = self.item_dict[selected]
 
+    # 旋转操作
+    def clockwise_rotate(self):
+        if self.selected_id != '':
+            if self.temp_item.item_type == 'ellipse' and self.rotate_angle % 90 != 0:
+                self.main_window.statusBar().showMessage('椭圆图元只能旋转90°及其倍数, 当前角度: '+str(self.rotate_angle))
+                return
+            self.main_window.statusBar().showMessage('顺时针旋转'+ str(self.rotate_angle) +'度')
+            xc = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
+            yc = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
+            self.temp_item.p_list = alg.rotate(self.temp_item.p_list,xc,yc,self.rotate_angle)
+        else:
+            self.main_window.statusBar().showMessage('请选择你要旋转的图元')
+
+    def anticlockwise_rotate(self):
+        if self.selected_id != '':
+            if self.temp_item.item_type == 'ellipse' and self.rotate_angle % 90 != 0:
+                self.main_window.statusBar().showMessage('椭圆图元只能旋转90°及其倍数, 当前角度: '+str(self.rotate_angle))
+                return
+            self.main_window.statusBar().showMessage('逆时针旋转'+ str(self.rotate_angle) +'度')
+            xc = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
+            yc = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
+            self.temp_item.p_list = alg.rotate(self.temp_item.p_list,xc,yc,360 - self.rotate_angle)
+        else:
+            self.main_window.statusBar().showMessage('请选择你要旋转的图元')
+
+    def set_rotate_angle(self):
+        text, ok = QInputDialog.getText(self, '请输入新的角度', '(0 <= angle <= 360)')
+        if ok:
+            self.rotate_angle = float(text)
+            self.main_window.statusBar().showMessage('设置的角度为: '+text)
+
+    # 裁剪操作
+    def start_clip(self, algorithm: str):
+        self.status = 'clipitem'
+        self.temp_algorithm = algorithm
+
+    def do_clip(self):
+        for eachitem in self.item_dict.values():
+            if eachitem.item_type == 'line':
+                x_min,y_min = self.clip_item.boundingrect[0], self.clip_item.boundingrect[1]
+                x_max,y_max = self.clip_item.boundingrect[2], self.clip_item.boundingrect[3]
+                tmplist = alg.clip(eachitem.p_list,x_min,y_min,x_max,y_max, self.temp_algorithm)
+                if len(tmplist) != 0:
+                    eachitem.p_list = tmplist
+
+    def finish_clip(self):
+        self.status = ''
+        self.temp_algorithm = ''
+        self.clip_item = None
 
     # 鼠标事件
     def mousePressEvent(self, event: QMouseEvent) -> None:
@@ -102,7 +154,10 @@ class MyCanvas(QGraphicsView):
         x = int(pos.x())
         y = int(pos.y())
         if self.selected_id == '':
-            if self.status == 'line':
+            if self.status == 'clipitem':
+                self.clip_item = MyItem('0', self.status, [[x, y], [x, y]], QColor(0,0,0))
+                self.scene().addItem(self.clip_item)
+            elif self.status == 'line':
                 self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
                 self.scene().addItem(self.temp_item)
             elif self.status == 'triangle':
@@ -157,7 +212,9 @@ class MyCanvas(QGraphicsView):
         x = int(pos.x())
         y = int(pos.y())
         if self.selected_id == '':
-            if self.status == 'line':
+            if self.status == 'clipitem':
+                self.clip_item.p_list[1] = [x, y]
+            elif self.status == 'line':
                 self.temp_item.p_list[1] = [x, y]
             elif self.status == 'triangle':
                 self.temp_item.p_list[1] = [x, y]
@@ -265,7 +322,12 @@ class MyCanvas(QGraphicsView):
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if self.selected_id == '':
-            if self.status == 'line':
+            if self.status == 'clipitem':
+                self.do_clip()
+                self.scene().removeItem(self.clip_item)
+                self.updateScene([self.sceneRect()])
+                self.finish_clip()
+            elif self.status == 'line':
                 self.item_dict[self.temp_id] = self.temp_item
                 self.list_widget.addItem(self.temp_id)
                 self.finish_draw()
@@ -397,7 +459,10 @@ class MyItem(QGraphicsItem):
 
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = ...) -> None:
-        if self.item_type == 'line':
+        if self.item_type == 'clipitem':
+            painter.setPen(QPen(self.color, 2, Qt.DotLine))
+            painter.drawRect(self.boundingRect())
+        elif self.item_type == 'line':
             item_pixels = alg.draw_line(self.p_list, self.algorithm)
             for p in item_pixels:
                 painter.setPen(QPen(self.color,2))
@@ -433,8 +498,6 @@ class MyItem(QGraphicsItem):
                 painter.drawPoint(*p)
             if self.selected:
                 self.selectedDraw(painter)
-                # painter.setPen(QColor(255, 0, 0))
-                # painter.drawRect(self.boundingRect())
         elif self.item_type == 'otherpolygon':
             item_pixels = alg.draw_multilines(self.p_list, self.algorithm)
             for p in item_pixels:
@@ -442,8 +505,6 @@ class MyItem(QGraphicsItem):
                 painter.drawPoint(*p)
             if self.selected:
                 self.selectedDraw(painter)
-                # painter.setPen(QColor(255, 0, 0))
-                # painter.drawRect(self.boundingRect())
         elif self.item_type == 'ellipse':
             x0, y0 = self.p_list[0]
             x1, y1 = self.p_list[1]
@@ -456,8 +517,6 @@ class MyItem(QGraphicsItem):
                 painter.drawPoint(*p)
             if self.selected:
                 self.selectedDraw(painter)
-                # painter.setPen(QColor(255, 0, 0))
-                # painter.drawRect(self.boundingRect())
         elif self.item_type == 'curve':
             if self.finish == False:
                 item_pixels = alg.draw_multilines(self.p_list, 'DDA')
@@ -471,8 +530,7 @@ class MyItem(QGraphicsItem):
                     painter.drawPoint(*p)
                 if self.selected:
                     self.selectedDraw(painter)
-                    # painter.setPen(QColor(255, 0, 0))
-                    # painter.drawRect(self.boundingRect())
+
 
     def selectedDraw(self, painter: QPainter):
         painter.setPen(QColor(255, 0, 0))
@@ -491,7 +549,16 @@ class MyItem(QGraphicsItem):
         #     self.rotationP = [x_mid, self.boundingrect[1] - 3 * self.rotationR]
 
     def boundingRect(self) -> QRectF:
-        if self.item_type == 'line':
+        if self.item_type == 'clipitem':
+            x0, y0 = self.p_list[0]
+            x1, y1 = self.p_list[1]
+            x = min(x0, x1)
+            y = min(y0, y1)
+            w = max(x0, x1) - x
+            h = max(y0, y1) - y
+            self.boundingrect = [x, y, max(x0, x1), max(y0, y1)]
+            return QRectF(x, y, w, h)
+        elif self.item_type == 'line':
             x0, y0 = self.p_list[0]
             x1, y1 = self.p_list[1]
             x = min(x0, x1)
@@ -574,7 +641,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.item_cnt = 0
+        self.item_cnt = 1
 
         # 使用QListWidget来记录已有的图元，并用于选择图元。注：这是图元选择的简单实现方法，更好的实现是在画布中直接用鼠标选择图元
         self.list_widget = QListWidget(self)
@@ -618,11 +685,13 @@ class MainWindow(QMainWindow):
         curve_bezier_act = curve_menu.addAction('Bezier')
         curve_b_spline_act = curve_menu.addAction('B-spline')
 
-        edit_menu = menubar.addMenu('编辑')
-        translate_act = edit_menu.addAction('平移')
-        rotate_act = edit_menu.addAction('旋转')
-        scale_act = edit_menu.addAction('缩放')
-        clip_menu = edit_menu.addMenu('裁剪')
+
+        rotate_menu = menubar.addMenu('旋转')
+        clockwise_act = rotate_menu.addAction('顺时针旋转')
+        anticlockwise_act = rotate_menu.addAction('逆时针旋转')
+        setangle_act = rotate_menu.addAction('设置旋转角度')
+
+        clip_menu = menubar.addMenu('裁剪')
         clip_cohen_sutherland_act = clip_menu.addAction('Cohen-Sutherland')
         clip_liang_barsky_act = clip_menu.addAction('Liang-Barsky')
 
@@ -650,9 +719,19 @@ class MainWindow(QMainWindow):
         curve_bezier_act.triggered.connect(self.curve_bezier_actiton)
         curve_b_spline_act.triggered.connect(self.curve_b_spline_action)
 
-        # 选中
+        #旋转目录
+        clockwise_act.triggered.connect(self.canvas_widget.clockwise_rotate)
+        anticlockwise_act.triggered.connect(self.canvas_widget.anticlockwise_rotate)
+        setangle_act.triggered.connect(self.canvas_widget.set_rotate_angle)
+
+        #裁剪目录
+        clip_cohen_sutherland_act.triggered.connect(self.clip_cohen_sutherland_action)
+        clip_liang_barsky_act.triggered.connect(self.clip_liang_barsky_action)
+
+        #选中操作
         self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
         #self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
+
 
         # 设置主窗口的布局
         self.hbox_layout = QHBoxLayout()
@@ -675,11 +754,12 @@ class MainWindow(QMainWindow):
         self.canvas_widget.color = QColorDialog.getColor()
         self.statusBar().showMessage('设置画笔颜色')
 
+
     def reset_canvas_action(self):
         self.list_widget.currentTextChanged.disconnect(self.canvas_widget.selection_changed)
         self.list_widget.clear() # clear之前必须解除槽函数和信号的connect
         self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
-        self.item_cnt = 0
+        self.item_cnt = 1
         text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width height')
         if ok:
             text = text.strip().split(' ')
@@ -698,78 +778,92 @@ class MainWindow(QMainWindow):
     # 绘制目录操作 - 直线
     def line_naive_action(self):
         self.canvas_widget.start_draw_line('Naive', self.get_id())
-        self.statusBar().showMessage('Naive算法绘制线段')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('Naive算法绘制线段')
 
     def line_dda_action(self):
         self.canvas_widget.start_draw_line('DDA', self.get_id())
-        self.statusBar().showMessage('DDA算法绘制线段')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('DDA算法绘制线段')
 
     def line_bresenham_action(self):
         self.canvas_widget.start_draw_line('Bresenham', self.get_id())
-        self.statusBar().showMessage('Bresenham算法绘制线段')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('Bresenham算法绘制线段')
 
     # 绘制目录操作 - 多边形
     def triangle_dda_action(self):
         self.canvas_widget.start_draw_polygon('triangle', 'DDA', self.get_id())
-        self.statusBar().showMessage('DDA算法绘制三角形')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('DDA算法绘制三角形')
 
     def triangle_bresenham_action(self):
         self.canvas_widget.start_draw_polygon('triangle', 'Bresenham', self.get_id())
-        self.statusBar().showMessage('Bresenham算法绘制三角形')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('Bresenham算法绘制三角形')
 
     def rectangle_dda_action(self):
         self.canvas_widget.start_draw_polygon('rectangle', 'DDA', self.get_id())
-        self.statusBar().showMessage('DDA算法绘制矩形')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('DDA算法绘制矩形')
 
     def rectangle_bresenham_action(self):
         self.canvas_widget.start_draw_polygon('rectangle', 'Bresenham', self.get_id())
-        self.statusBar().showMessage('Bresenham算法绘制矩形')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('Bresenham算法绘制矩形')
 
     def otherpolygon_dda_action(self):
         self.canvas_widget.start_draw_polygon('otherpolygon', 'DDA', self.get_id())
-        self.statusBar().showMessage('DDA算法绘制自定义多边形')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('DDA算法绘制自定义多边形')
 
     def otherpolygon_bresenham_action(self):
         self.canvas_widget.start_draw_polygon('otherpolygon', 'Bresenham', self.get_id())
-        self.statusBar().showMessage('Bresenham算法绘制自定义多边形')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('Bresenham算法绘制自定义多边形')
 
     # 绘制目录操作 - 椭圆
     def ellipse_action(self):
         self.canvas_widget.start_draw_ellipse(self.get_id())
-        self.statusBar().showMessage('绘制椭圆')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('绘制椭圆')
 
     # 绘制目录操作 - 曲线
     def curve_bezier_actiton(self):
         self.canvas_widget.start_draw_curve('Bezier',self.get_id())
-        self.statusBar().showMessage('Bezier算法绘制曲线')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('Bezier算法绘制曲线')
 
     def curve_b_spline_action(self):
         self.canvas_widget.start_draw_curve('B-spline',self.get_id())
-        self.statusBar().showMessage('B-spline算法绘制曲线')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('B-spline算法绘制曲线')
+
+    #裁剪操作
+    def clip_cohen_sutherland_action(self):
+        self.canvas_widget.start_clip('Cohen-Sutherland')
+        self.list_widget.clearSelection()
+        self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('cohen_sutherland算法裁剪线段')
+
+    def clip_liang_barsky_action(self):
+        self.canvas_widget.start_clip('Liang-Barsky')
+        self.list_widget.clearSelection()
+        self.canvas_widget.clear_selection()
+        self.statusBar().showMessage('liang_barsky算法裁剪线段')
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
