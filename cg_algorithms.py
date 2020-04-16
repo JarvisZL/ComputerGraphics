@@ -116,6 +116,7 @@ def draw_line(p_list, algorithm):
                     x = x - 1
     return result
 
+# forGuI
 def draw_multilines(p_list, algorithm):
     """ 用于GUI绘制多边形过程
     :param p_list: (list of list of int: [[x0, y0], [x1, y1], [x2, y2], ...]) 多边形的顶点坐标列表
@@ -148,7 +149,6 @@ def draw_ellipse(p_list):
     :param p_list: (list of list of int: [[x0, y0], [x1, y1]]) 椭圆的矩形包围框左上角和右下角顶点坐标
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
-    print("Call ellipse")
     x0, y0 = p_list[0]
     x1, y1 = p_list[1]
     if x0 == x1 or y1 == y0:
@@ -183,7 +183,6 @@ def draw_ellipse(p_list):
                 y = y - 1
                 p2 = p2 + 2*ry*ry*x - 2*rx*rx*y + rx*rx
         result.append([int(x + xc), int(y + yc)]) # the last one (rx,0)
-        print(int(x + xc))
     else:
         x, y = rx, 0
         p1 = rx * rx - ry * ry * rx + ry * ry / 4
@@ -219,7 +218,6 @@ def draw_ellipse(p_list):
         result.append([int(-xx + xc), int(-yy + yc)])
         result.append([int(-xx + xc), int(yy + yc)])
 
-    print("ellipse return")
     return result
 
 
@@ -329,13 +327,13 @@ def rotate(p_list, x, y, r):
     :param p_list: (list of list of int: [[x0, y0], [x1, y1], [x2, y2], ...]) 图元参数
     :param x: (int) 旋转中心x坐标
     :param y: (int) 旋转中心y坐标
-    :param r: (int) 顺时针旋转角度（°）
+    :param r: (int) 顺时针旋转角度（°）相对于坐标系
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 变换后的图元参数
     """
     ret = []
     for x0,y0 in p_list:
-        xx = x + (x0 - x) * math.cos(-r / 180 * math.pi) - (y0 - y) * math.sin(-r / 180 * math.pi)
-        yy = y + (x0 - x) * math.sin(-r / 180 * math.pi) + (y0 - y) * math.cos(-r / 180 * math.pi)
+        xx = x + (x0 - x) * math.cos(r / 180 * math.pi) - (y0 - y) * math.sin(r / 180 * math.pi)
+        yy = y + (x0 - x) * math.sin(r / 180 * math.pi) + (y0 - y) * math.cos(r / 180 * math.pi)
         ret.append([int(xx),int(yy)])
     return ret
 
@@ -352,9 +350,26 @@ def scale(p_list, x, y, s):
     for x0,y0 in p_list:
         xx = x0 * s + x * (1 - s)
         yy = y0 * s + y * (1 - s)
-        ret.append([int(xx),int(yy)])
+        ret.append([round(xx),round(yy)])
     return ret
 
+# forGUI
+def scaleforgui(p_list, x, y, sx, sy):
+    """缩放变换
+
+    :param p_list: (list of list of int: [[x0, y0], [x1, y1], [x2, y2], ...]) 图元参数
+    :param x: (int) 缩放中心x坐标
+    :param y: (int) 缩放中心y坐标
+    :param sx: (float) x缩放倍数
+    :param sy: (float) y缩放倍数
+    :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 变换后的图元参数
+    """
+    ret = []
+    for x0,y0 in p_list:
+        xx = x0 * sx + x * (1 - sx)
+        yy = y0 * sy + y * (1 - sy)
+        ret.append([round(xx),round(yy)])
+    return ret
 
 def Encode(point,x_min, y_min, x_max, y_max):
     LEFT,RIGHT,UP,BOTTOM = 1,2,4,8

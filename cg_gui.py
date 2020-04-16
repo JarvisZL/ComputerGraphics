@@ -3,6 +3,7 @@
 
 import sys
 import os
+import numpy as np
 import cg_algorithms as alg
 from typing import Optional
 from PyQt5.QtWidgets import (
@@ -16,8 +17,8 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QWidget,
     QStyleOptionGraphicsItem, QColorDialog, QInputDialog, QFileDialog)
-from PyQt5.QtGui import QPainter, QMouseEvent, QColor, QIcon
-from PyQt5.QtCore import QRectF, QRect
+from PyQt5.QtGui import QPainter, QMouseEvent, QColor, QIcon, QPen
+from PyQt5.QtCore import QRectF, QPoint, Qt
 
 
 class MyCanvas(QGraphicsView):
@@ -39,6 +40,10 @@ class MyCanvas(QGraphicsView):
         self.color = QColor(0, 0, 0)
         self.painting = False # 多边形和曲线绘制过程中控制
         self.edgenum = 0 # 多边形和曲线绘制过程中控制
+
+        self.editstatus = ''
+        self.editoriginpoint = []
+
 
     # 开始绘制操作
     def start_draw_line(self, algorithm, item_id):
@@ -70,8 +75,12 @@ class MyCanvas(QGraphicsView):
         if self.selected_id != '':
             self.item_dict[self.selected_id].selected = False
             self.selected_id = ''
+        # 取消鼠标追踪
+        self.setMouseTracking(False)
+        self.main_window.statusBar().showMessage('')
 
-    def selection_changed(self, selected):
+    def selection_changed(self, selectedItem):
+        selected = selectedItem.text()
         self.main_window.statusBar().showMessage('图元选择： %s' % selected)
         if self.selected_id != '':
             self.item_dict[self.selected_id].selected = False
@@ -82,42 +91,64 @@ class MyCanvas(QGraphicsView):
         self.status = ''
         self.updateScene([self.sceneRect()])  # 调用paint
 
+        # 选中后进入编辑阶段，开始追踪鼠标移动的位置，并将当前item设为选中的item
+        self.setMouseTracking(True)
+        self.temp_item = self.item_dict[selected]
+
+
     # 鼠标事件
     def mousePressEvent(self, event: QMouseEvent) -> None:
         pos = self.mapToScene(event.localPos().toPoint())
         x = int(pos.x())
         y = int(pos.y())
-        if self.status == 'line':
-            self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
-            self.scene().addItem(self.temp_item)
-        elif self.status == 'triangle':
-            self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
-            self.scene().addItem(self.temp_item)
-        elif self.status == 'rectangle':
-            self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
-            self.scene().addItem(self.temp_item)
-        elif self.status == 'otherpolygon':
-            if self.painting == False:
+        if self.selected_id == '':
+            if self.status == 'line':
                 self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
                 self.scene().addItem(self.temp_item)
-                self.edgenum = 1
-                self.painting = True
-            else:
-                self.edgenum = self.edgenum + 1
-                self.temp_item.p_list.append([x, y])
-        elif self.status == 'ellipse':
-            self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color)
-            print(x,y)
-            self.scene().addItem(self.temp_item)
-        elif self.status == 'curve':
-            if self.painting == False:
-                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm, False)
+            elif self.status == 'triangle':
+                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm,False)
                 self.scene().addItem(self.temp_item)
-                self.edgenum = 1
-                self.painting = True
+            elif self.status == 'rectangle':
+                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y], [x, y], [x, y]], self.color, self.temp_algorithm)
+                self.scene().addItem(self.temp_item)
+            elif self.status == 'otherpolygon':
+                if self.painting == False:
+                    self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
+                    self.scene().addItem(self.temp_item)
+                    self.edgenum = 1
+                    self.painting = True
+                else:
+                    self.edgenum = self.edgenum + 1
+                    self.temp_item.p_list.append([x, y])
+            elif self.status == 'ellipse':
+                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color)
+                self.scene().addItem(self.temp_item)
+            elif self.status == 'curve':
+                if self.painting == False:
+                    self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm, False)
+                    self.scene().addItem(self.temp_item)
+                    self.edgenum = 1
+                    self.painting = True
+                else:
+                    self.edgenum = self.edgenum + 1
+                    self.temp_item.p_list.append([x, y])
+        else:
+            area = self.getPointArea(x, y)
+            if area == 'Translate':
+                self.setCursor(Qt.ClosedHandCursor)
+                self.editstatus = area
+                self.editoriginpoint = [x, y]
+            elif area == 'Outer':
+                self.unsetCursor()
+                self.editstatus = ''
+                self.editoriginpoint.clear()
+                self.main_window.list_widget.clearSelection()
+                self.clear_selection()
             else:
-                self.edgenum = self.edgenum + 1
-                self.temp_item.p_list.append([x, y])
+                self.setCursor(Qt.CrossCursor)
+                self.editstatus = area
+                self.editoriginpoint = [x, y]
+
         self.updateScene([self.sceneRect()])
         super().mousePressEvent(event)
 
@@ -125,62 +156,200 @@ class MyCanvas(QGraphicsView):
         pos = self.mapToScene(event.localPos().toPoint())
         x = int(pos.x())
         y = int(pos.y())
-        if self.status == 'line':
-            self.temp_item.p_list[1] = [x, y]
-        elif self.status == 'triangle':
-            self.temp_item.p_list[1] = [x, y]
-        elif self.status == 'rectangle':
-            self.temp_item.p_list[1] = [x, y]
-        elif self.status == 'otherpolygon':
-            self.temp_item.p_list[self.edgenum] = [x, y]
-        elif self.status == 'ellipse':
-            self.temp_item.p_list[1] = [x, y]
-        elif self.status == 'curve':
-            self.temp_item.p_list[self.edgenum] = [x, y]
-
+        if self.selected_id == '':
+            if self.status == 'line':
+                self.temp_item.p_list[1] = [x, y]
+            elif self.status == 'triangle':
+                self.temp_item.p_list[1] = [x, y]
+            elif self.status == 'rectangle':
+                self.temp_item.p_list[1] = [self.temp_item.p_list[0][0], y]
+                self.temp_item.p_list[2] = [x, y]
+                self.temp_item.p_list[3] = [x, self.temp_item.p_list[0][1]]
+            elif self.status == 'otherpolygon':
+                self.temp_item.p_list[self.edgenum] = [x, y]
+            elif self.status == 'ellipse':
+                self.temp_item.p_list[1] = [x, y]
+            elif self.status == 'curve':
+                self.temp_item.p_list[self.edgenum] = [x, y]
+        else:
+            # 并未处在edit状态中
+            if self.editstatus == '':
+                area = self.getPointArea(x, y)
+                if area == 'Translate':
+                    self.setCursor(Qt.OpenHandCursor)
+                elif area == 'Scale1' or area == 'Scale8':
+                    self.setCursor(Qt.SizeFDiagCursor)
+                elif area == 'Scale2' or area == 'Scale7':
+                    self.setCursor(Qt.SizeVerCursor)
+                elif area == 'Scale3' or area == 'Scale6':
+                    self.setCursor(Qt.SizeBDiagCursor)
+                elif area == 'Scale4' or area == 'Scale5':
+                    self.setCursor(Qt.SizeHorCursor)
+                else:
+                    self.unsetCursor()
+            # 正在edit状态中
+            else:
+                if self.editstatus == 'Translate':
+                    self.temp_item.p_list = alg.translate(self.temp_item.p_list, x - self.editoriginpoint[0],
+                                                          y - self.editoriginpoint[1])
+                    self.editoriginpoint[0] = x
+                    self.editoriginpoint[1] = y
+                elif self.editstatus == 'Scale1':
+                    xc,yc = self.temp_item.boundingrect[2], self.temp_item.boundingrect[3]
+                    x = xc - 5 if xc - x < 5 else x
+                    y = yc - 5 if yc - y < 5 else y
+                    sx = (xc - x)/(xc - self.temp_item.boundingrect[0])
+                    sy = (yc - y)/(yc - self.temp_item.boundingrect[1])
+                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1)
+                        and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1)):
+                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc,sx,sy)
+                elif self.editstatus == 'Scale2':
+                    xc = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
+                    yc = self.temp_item.boundingrect[3]
+                    y = yc - 5 if yc - y < 5 else y
+                    sy = (yc - y) / (yc - self.temp_item.boundingrect[1])
+                    if self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1:
+                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, 1, sy)
+                elif self.editstatus == 'Scale3':
+                    xc, yc = self.temp_item.boundingrect[0], self.temp_item.boundingrect[3]
+                    x = xc + 5 if x - xc < 5 else x
+                    y = yc - 5 if yc - y < 5 else y
+                    sx = (xc - x) / (xc - self.temp_item.boundingrect[2])
+                    sy = (yc - y) / (yc - self.temp_item.boundingrect[1])
+                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1)
+                            and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1)):
+                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, sx, sy)
+                elif self.editstatus == 'Scale4':
+                    xc = self.temp_item.boundingrect[2]
+                    yc = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
+                    x = xc - 5 if xc - x < 5 else x
+                    sx = (xc - x) / (xc - self.temp_item.boundingrect[0])
+                    if self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1:
+                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, sx, 1)
+                elif self.editstatus == 'Scale5':
+                    xc = self.temp_item.boundingrect[0]
+                    yc = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3]) / 2)
+                    x = xc + 5 if x - xc < 5 else x
+                    sx = (xc - x) / (xc - self.temp_item.boundingrect[2])
+                    if self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1:
+                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, sx, 1)
+                elif self.editstatus == 'Scale6':
+                    xc, yc = self.temp_item.boundingrect[2], self.temp_item.boundingrect[1]
+                    x = xc - 5 if xc - x < 5 else x
+                    y = yc + 5 if y - yc < 5 else y
+                    sx = (xc - x) / (xc - self.temp_item.boundingrect[0])
+                    sy = (yc - y) / (yc - self.temp_item.boundingrect[3])
+                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1)
+                            and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1)):
+                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, sx, sy)
+                elif self.editstatus == 'Scale7':
+                    xc = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
+                    yc = self.temp_item.boundingrect[1]
+                    y = yc + 5 if y - yc < 5 else y
+                    sy = (yc - y) / (yc - self.temp_item.boundingrect[3])
+                    if self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1:
+                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, 1, sy)
+                elif self.editstatus == 'Scale8':
+                    xc,yc = self.temp_item.boundingrect[0], self.temp_item.boundingrect[1]
+                    x = xc + 5 if x - xc < 5 else x
+                    y = yc + 5 if y - yc < 5 else y
+                    sx = (xc - x) / (xc - self.temp_item.boundingrect[2])
+                    sy = (yc - y) / (yc - self.temp_item.boundingrect[3])
+                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1)
+                            and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1)):
+                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, sx, sy)
+                else:
+                    pass
         self.updateScene([self.sceneRect()])
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if self.status == 'line':
-            self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id)
-            self.finish_draw()
-        elif self.status == 'triangle':
-            self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id)
-            self.finish_draw()
-        elif self.status == 'rectangle':
-            self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id)
-            self.finish_draw()
-        elif self.status == 'otherpolygon':
-            xf, yf = self.temp_item.p_list[self.edgenum]
-            xb, yb = self.temp_item.p_list[0]
-            if (xf - xb) ** 2 + (yf - yb) ** 2 <= 25:
-                self.temp_item.p_list[self.edgenum] = [xb, yb]
-                self.updateScene([self.sceneRect()])
+        if self.selected_id == '':
+            if self.status == 'line':
                 self.item_dict[self.temp_id] = self.temp_item
                 self.list_widget.addItem(self.temp_id)
                 self.finish_draw()
-        elif self.status == 'ellipse':
-            self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id)
-            self.finish_draw()
-        elif self.status == 'curve':
-            pass
-
+            elif self.status == 'triangle':
+                self.temp_item.finish = True
+                x0, y0 = self.temp_item.p_list[0]
+                x1, y1 = self.temp_item.p_list[1]
+                self.temp_item.p_list[0] = [x0, max(y0, y1)]
+                self.temp_item.p_list[1] = [x1, max(y0, y1)]
+                self.temp_item.p_list.append([int((x0 + x1) / 2), min(y0, y1)])
+                self.item_dict[self.temp_id] = self.temp_item
+                self.list_widget.addItem(self.temp_id)
+                self.finish_draw()
+            elif self.status == 'rectangle':
+                self.item_dict[self.temp_id] = self.temp_item
+                self.list_widget.addItem(self.temp_id)
+                self.finish_draw()
+            elif self.status == 'otherpolygon':
+                xf, yf = self.temp_item.p_list[self.edgenum]
+                xb, yb = self.temp_item.p_list[0]
+                if (xf - xb) ** 2 + (yf - yb) ** 2 <= 25:
+                    self.temp_item.p_list[self.edgenum] = [xb, yb]
+                    self.updateScene([self.sceneRect()])
+                    self.item_dict[self.temp_id] = self.temp_item
+                    self.list_widget.addItem(self.temp_id)
+                    self.finish_draw()
+            elif self.status == 'ellipse':
+                self.item_dict[self.temp_id] = self.temp_item
+                self.list_widget.addItem(self.temp_id)
+                self.finish_draw()
+            elif self.status == 'curve':
+                pass
+        else:
+            self.unsetCursor()
+            self.editstatus = ''
+            self.editoriginpoint.clear()
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
-        if self.status == 'curve':
-            self.temp_item.curvefinish = True
-            self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id)
-            self.finish_draw()
-            self.updateScene([self.sceneRect()])
+        if self.selected_id == '':
+            if self.status == 'curve':
+                self.temp_item.finish = True
+                self.item_dict[self.temp_id] = self.temp_item
+                self.list_widget.addItem(self.temp_id)
+                self.finish_draw()
+                self.updateScene([self.sceneRect()])
 
 
+    def getPointArea(self, x: int, y: int) -> str:
+        x_mid = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
+        y_mid = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
+        if abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
+            return 'Scale1'
+        elif abs(x - x_mid) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
+            return 'Scale2'
+        elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
+            return 'Scale3'
+        elif abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - y_mid) <= 3:
+            return 'Scale4'
+        elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - y_mid) <= 3:
+            return 'Scale5'
+        elif abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
+            return 'Scale6'
+        elif abs(x - x_mid) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
+            return 'Scale7'
+        elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
+            return 'Scale8'
+        elif (x > self.temp_item.boundingrect[0] + 3 and x < self.temp_item.boundingrect[2] - 3
+                and y > self.temp_item.boundingrect[1] + 3 and y < self.temp_item.boundingrect[3] - 3):
+            return 'Translate'
+        else:
+            return 'Outer'
+
+    # def getDegree(self, vec1, vec2):
+    #     L1 = np.sqrt(vec1.dot(vec1))
+    #     L2 = np.sqrt(vec2.dot(vec2))
+    #     cos_angle = vec1.dot(vec2) / (L1 * L2)
+    #     angle = np.degrees(np.arccos(cos_angle))
+    #     if np.cross(vec1,vec2) > 0:
+    #         # 相对于坐标系的逆时针
+    #         return -1*angle
+    #     else:
+    #         # 相对于坐标系的顺时针
+    #         return angle
 
     def resetcanvas(self):
         self.item_dict.clear()
@@ -201,7 +370,7 @@ class MyItem(QGraphicsItem):
     自定义图元类，继承自QGraphicsItem
     """
 
-    def __init__(self, item_id: str, item_type: str, p_list: list, color: QColor, algorithm: str = '', curvefinish: bool = False,
+    def __init__(self, item_id: str, item_type: str, p_list: list, color: QColor, algorithm: str = '', finish: bool = False,
                  parent: QGraphicsItem = None):
         """
 
@@ -210,7 +379,7 @@ class MyItem(QGraphicsItem):
         :param p_list: 图元参数
         :param algorithm: 绘制算法，'DDA'、'Bresenham'、'Bezier'、'B-spline'等
         :param color: 画笔颜色
-        :param curvefinish: 标记曲线是否绘制完毕
+        :param finish: 标记曲线和三角形是否绘制完毕
         :param parent:
         """
         super().__init__(parent)
@@ -220,55 +389,61 @@ class MyItem(QGraphicsItem):
         self.color = color  # 画笔颜色
         self.algorithm = algorithm  # 绘制算法，'DDA'、'Bresenham'、'Bezier'、'B-spline'等
         self.selected = False
-        self.curvefinish = curvefinish
+        self.finish = finish
+        self.boundingrect = [] # 记录图元外接矩形的左上角和右下角坐标[x_min,y_min,x_max,y_max]
+        # self.rotationcenter = []
+        # self.rotationR = 10 # 旋转标记的半径
+        # self.rotationP = [] # 旋转标记的圆心[xc,yc]
+
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = ...) -> None:
         if self.item_type == 'line':
             item_pixels = alg.draw_line(self.p_list, self.algorithm)
             for p in item_pixels:
-                painter.setPen(self.color)
+                painter.setPen(QPen(self.color,2))
                 painter.drawPoint(*p)
             if self.selected:
-                painter.setPen(QColor(255, 0, 0))
-                painter.drawRect(self.boundingRect())
+                self.selectedDraw(painter)
         elif self.item_type == 'triangle':
             # 得到三角形外接矩形的两个顶点
-            x0,y0 = self.p_list[0]
-            x1,y1 = self.p_list[1]
-            plist = []
-            plist.append([x0, max(y0,y1)])
-            plist.append([x1, max(y0,y1)])
-            plist.append([int((x0+x1)/2), min(y0,y1)])
-            item_pixels = alg.draw_polygon(plist,self.algorithm)
-            for p in item_pixels:
-                painter.setPen(self.color)
-                painter.drawPoint(*p)
-            if self.selected:
-                painter.setPen(QColor(255, 0, 0))
-                painter.drawRect(self.boundingRect())
+            if self.finish == False:
+                x0,y0 = self.p_list[0]
+                x1,y1 = self.p_list[1]
+                plist = []
+                plist.append([x0, max(y0,y1)])
+                plist.append([x1, max(y0,y1)])
+                plist.append([int((x0+x1)/2), min(y0,y1)])
+                item_pixels = alg.draw_polygon(plist,self.algorithm)
+                for p in item_pixels:
+                    painter.setPen(QPen(self.color, 2))
+                    painter.drawPoint(*p)
+                if self.selected:
+                    self.selectedDraw(painter)
+            else:
+                item_pixels = alg.draw_polygon(self.p_list, self.algorithm)
+                for p in item_pixels:
+                    painter.setPen(QPen(self.color, 2))
+                    painter.drawPoint(*p)
+                if self.selected:
+                    self.selectedDraw(painter)
         elif self.item_type == 'rectangle':
-            x0,y0 = self.p_list[0]
-            x1,y1 = self.p_list[1]
-            plist = []
-            plist.append(self.p_list[0])
-            plist.append([x0, y1])
-            plist.append(self.p_list[1])
-            plist.append([x1, y0])
-            item_pixels = alg.draw_polygon(plist, self.algorithm)
+            item_pixels = alg.draw_polygon(self.p_list, self.algorithm)
             for p in item_pixels:
-                painter.setPen(self.color)
+                painter.setPen(QPen(self.color,2))
                 painter.drawPoint(*p)
             if self.selected:
-                painter.setPen(QColor(255, 0, 0))
-                painter.drawRect(self.boundingRect())
+                self.selectedDraw(painter)
+                # painter.setPen(QColor(255, 0, 0))
+                # painter.drawRect(self.boundingRect())
         elif self.item_type == 'otherpolygon':
             item_pixels = alg.draw_multilines(self.p_list, self.algorithm)
             for p in item_pixels:
-                painter.setPen(self.color)
+                painter.setPen(QPen(self.color,2))
                 painter.drawPoint(*p)
             if self.selected:
-                painter.setPen(QColor(255, 0, 0))
-                painter.drawRect(self.boundingRect())
+                self.selectedDraw(painter)
+                # painter.setPen(QColor(255, 0, 0))
+                # painter.drawRect(self.boundingRect())
         elif self.item_type == 'ellipse':
             x0, y0 = self.p_list[0]
             x1, y1 = self.p_list[1]
@@ -277,29 +452,43 @@ class MyItem(QGraphicsItem):
             plist.append([max(x0, x1), max(y0, y1)])
             item_pixels = alg.draw_ellipse(plist)
             for p in item_pixels:
-                painter.setPen(self.color)
-                print(*p)
+                painter.setPen(QPen(self.color,2))
                 painter.drawPoint(*p)
             if self.selected:
-                painter.setPen(QColor(255, 0, 0))
-                painter.drawRect(self.boundingRect())
+                self.selectedDraw(painter)
+                # painter.setPen(QColor(255, 0, 0))
+                # painter.drawRect(self.boundingRect())
         elif self.item_type == 'curve':
-            if self.curvefinish == False:
+            if self.finish == False:
                 item_pixels = alg.draw_multilines(self.p_list, 'DDA')
                 for p in item_pixels:
                     painter.setPen(self.color)
                     painter.drawPoint(*p)
-                if self.selected:
-                    painter.setPen(QColor(255, 0, 0))
-                    painter.drawRect(self.boundingRect())
             else:
                 item_pixels = alg.draw_curve(self.p_list, self.algorithm)
                 for p in item_pixels:
-                    painter.setPen(self.color)
+                    painter.setPen(QPen(self.color,2))
                     painter.drawPoint(*p)
                 if self.selected:
-                    painter.setPen(QColor(255, 0, 0))
-                    painter.drawRect(self.boundingRect())
+                    self.selectedDraw(painter)
+                    # painter.setPen(QColor(255, 0, 0))
+                    # painter.drawRect(self.boundingRect())
+
+    def selectedDraw(self, painter: QPainter):
+        painter.setPen(QColor(255, 0, 0))
+        painter.drawRect(self.boundingRect())
+
+        # x_mid = int((self.boundingrect[0] + self.boundingrect[2]) / 2)
+        # if self.boundingrect[1] - 4 * self.rotationR < 0:
+        #     painter.drawLine(QPoint(x_mid, self.boundingrect[3]),QPoint(x_mid, self.boundingrect[3] + 2 * self.rotationR))
+        #     painter.setPen(QPen(QColor(255, 0, 0), 2, Qt.DashLine))
+        #     painter.drawEllipse(QPoint(x_mid, self.boundingrect[3] + 3 * self.rotationR), self.rotationR, self.rotationR)
+        #     self.rotationP = [x_mid, self.boundingrect[3] + 3 * self.rotationR]
+        # else:
+        #     painter.drawLine(QPoint(x_mid, self.boundingrect[1]), QPoint(x_mid, self.boundingrect[1] - 2 * self.rotationR))
+        #     painter.setPen(QPen(QColor(255, 0, 0), 2, Qt.DashLine))
+        #     painter.drawEllipse(QPoint(x_mid, self.boundingrect[1] - 3 * self.rotationR), self.rotationR, self.rotationR)
+        #     self.rotationP = [x_mid, self.boundingrect[1] - 3 * self.rotationR]
 
     def boundingRect(self) -> QRectF:
         if self.item_type == 'line':
@@ -309,23 +498,36 @@ class MyItem(QGraphicsItem):
             y = min(y0, y1)
             w = max(x0, x1) - x
             h = max(y0, y1) - y
+            self.boundingrect = [x, y, max(x0, x1), max(y0, y1)]
+            # if len(self.rotationcenter) == 0:
+            #     x_mid = int((x + max(x0, x1))/2)
+            #     y_mid = int((y + max(y0, y1))/2)
+            #     self.rotationcenter.append([x_mid, y_mid])
             return QRectF(x - 1, y - 1, w + 2, h + 2)
         elif self.item_type == 'triangle':
-            x0, y0 = self.p_list[0]
-            x1, y1 = self.p_list[1]
-            x = min(x0, x1)
-            y = min(y0, y1)
-            w = max(x0, x1) - x
-            h = max(y0, y1) - y
-            return QRectF(x - 1, y - 1, w + 2, h + 2)
+            x_min, y_min = self.p_list[0]
+            x_max, y_max = self.p_list[0]
+            for x, y in self.p_list:
+                x_min = min(x_min, x)
+                y_min = min(y_min, y)
+                x_max = max(x_max, x)
+                y_max = max(y_max, y)
+            self.boundingrect = [x_min, y_min, x_max, y_max]
+            # if len(self.rotationcenter) == 0:
+            #     self.rotationcenter.append([int((x_min + x_max)/2),int((y_min+y_max)/2)])
+            return QRectF(x_min - 1, y_min - 1, x_max - x_min + 2, y_max - y_min + 2)
         elif self.item_type == 'rectangle':
-            x0, y0 = self.p_list[0]
-            x1, y1 = self.p_list[1]
-            x = min(x0, x1)
-            y = min(y0, y1)
-            w = max(x0, x1) - x
-            h = max(y0, y1) - y
-            return QRectF(x - 1, y - 1, w + 2, h + 2)
+            x_min, y_min = self.p_list[0]
+            x_max, y_max = self.p_list[0]
+            for x, y in self.p_list:
+                x_min = min(x_min, x)
+                y_min = min(y_min, y)
+                x_max = max(x_max, x)
+                y_max = max(y_max, y)
+            self.boundingrect = [x_min, y_min, x_max, y_max]
+            # if len(self.rotationcenter) == 0:
+            #     self.rotationcenter.append([int((x_min + x_max)/2),int((y_min+y_max)/2)])
+            return QRectF(x_min - 1, y_min - 1, x_max - x_min + 2, y_max - y_min + 2)
         elif self.item_type == 'otherpolygon':
             x_min, y_min = self.p_list[0]
             x_max, y_max = self.p_list[0]
@@ -334,6 +536,9 @@ class MyItem(QGraphicsItem):
                 y_min = min(y_min, y)
                 x_max = max(x_max, x)
                 y_max = max(y_max, y)
+            self.boundingrect = [x_min, y_min, x_max, y_max]
+            # if len(self.rotationcenter) == 0:
+            #     self.rotationcenter.append([int((x_min + x_max)/2),int((y_min+y_max)/2)])
             return QRectF(x_min - 1, y_min - 1, x_max - x_min + 2, y_max - y_min + 2)
         elif self.item_type == 'ellipse':
             x0, y0 = self.p_list[0]
@@ -342,6 +547,11 @@ class MyItem(QGraphicsItem):
             y = min(y0, y1)
             w = max(x0, x1) - x
             h = max(y0, y1) - y
+            self.boundingrect = [x, y, max(x0, x1), max(y0, y1)]
+            # if len(self.rotationcenter) == 0:
+            #     x_mid = int((x + max(x0, x1))/2)
+            #     y_mid = int((y + max(y0, y1))/2)
+            #     self.rotationcenter.append([x_mid, y_mid])
             return QRectF(x - 1, y - 1, w + 2, h + 2)
         elif self.item_type == 'curve':
             x_min, y_min = self.p_list[0]
@@ -351,6 +561,9 @@ class MyItem(QGraphicsItem):
                 y_min = min(y_min, y)
                 x_max = max(x_max, x)
                 y_max = max(y_max, y)
+            self.boundingrect = [x_min, y_min, x_max, y_max]
+            # if len(self.rotationcenter) == 0:
+            #     self.rotationcenter.append([int((x_min + x_max)/2),int((y_min+y_max)/2)])
             return QRectF(x_min - 1, y_min - 1, x_max - x_min + 2, y_max - y_min + 2)
 
 
@@ -365,7 +578,7 @@ class MainWindow(QMainWindow):
 
         # 使用QListWidget来记录已有的图元，并用于选择图元。注：这是图元选择的简单实现方法，更好的实现是在画布中直接用鼠标选择图元
         self.list_widget = QListWidget(self)
-        self.list_widget.setMinimumWidth(200)
+        self.list_widget.setMinimumWidth(150)
 
         # 使用QGraphicsView作为画布
         self.scene = QGraphicsScene(self)
@@ -438,7 +651,8 @@ class MainWindow(QMainWindow):
         curve_b_spline_act.triggered.connect(self.curve_b_spline_action)
 
         # 选中
-        self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
+        self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
+        #self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
 
         # 设置主窗口的布局
         self.hbox_layout = QHBoxLayout()
