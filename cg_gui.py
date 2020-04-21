@@ -742,7 +742,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.statusBar().showMessage('空闲')
         self.resize(600, 600)
-        self.setWindowTitle('Just Drawing')
+        self.setWindowTitle('Enjoy Drawing')
 
     def get_id(self):
         _id = str(self.item_cnt)

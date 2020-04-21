@@ -477,12 +477,13 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
                 if q[i] < 0:
                     return []
 
-        xx1 = x1 + u1*(x2 - x1)
-        yy1 = y1 + u1*(y2 - y1)
-        xx2 = x1 + u2*(x2 - x1)
-        yy2 = y1 + u2*(y2 - y1)
-        result.append([int(xx1),int(yy1)])
-        result.append([int(xx2),int(yy2)])
+        if u1 <= u2:
+            xx1 = x1 + u1*(x2 - x1)
+            yy1 = y1 + u1*(y2 - y1)
+            xx2 = x1 + u2*(x2 - x1)
+            yy2 = y1 + u2*(y2 - y1)
+            result.append([int(xx1),int(yy1)])
+            result.append([int(xx2),int(yy2)])
         return result
 
 
