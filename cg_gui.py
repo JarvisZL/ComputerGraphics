@@ -756,9 +756,9 @@ class MainWindow(QMainWindow):
 
 
     def reset_canvas_action(self):
-        self.list_widget.currentTextChanged.disconnect(self.canvas_widget.selection_changed)
+        self.list_widget.itemClicked.disconnect(self.canvas_widget.selection_changed)
         self.list_widget.clear() # clear之前必须解除槽函数和信号的connect
-        self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
+        self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
         self.item_cnt = 1
         text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width height')
         if ok:
