@@ -1,6 +1,15 @@
 resetCanvas 600 600
+setColor 0 0 0
+drawLine l1 100 100 200 400 DDA
+setColor 0 255 0
+drawPolygon Pol1 200 200 300 200 300 300 200 300 DDA
 setColor 0 0 255
-drawPolygon p1 100 100 300 100 200 200 DDA
+drawCurve C1 100 100 200 400 300 400 400 100 B-spline
+setColor 255 0 0
+drawEllipse e1 100 100 200 150
 saveCanvas 1
-rotate p1 200 150 90
+translate l1 100 100
+translate Pol1 100 200
+translate C1 100 100
+translate e1 100 200
 saveCanvas 2

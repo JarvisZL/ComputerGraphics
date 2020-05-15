@@ -327,7 +327,7 @@ def rotate(p_list, x, y, r):
     :param p_list: (list of list of int: [[x0, y0], [x1, y1], [x2, y2], ...]) 图元参数
     :param x: (int) 旋转中心x坐标
     :param y: (int) 旋转中心y坐标
-    :param r: (int) 顺时针旋转角度（°）相对于坐标系
+    :param r: (int) 逆时针旋转角度（°）
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 变换后的图元参数
     """
     ret = []

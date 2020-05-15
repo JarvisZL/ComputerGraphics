@@ -108,6 +108,7 @@ class MyCanvas(QGraphicsView):
             xc = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
             yc = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
             self.temp_item.p_list = alg.rotate(self.temp_item.p_list,xc,yc,self.rotate_angle)
+            self.updateScene([self.sceneRect()])
         else:
             self.main_window.statusBar().showMessage('请选择你要旋转的图元')
 
@@ -120,6 +121,7 @@ class MyCanvas(QGraphicsView):
             xc = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
             yc = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
             self.temp_item.p_list = alg.rotate(self.temp_item.p_list,xc,yc,360 - self.rotate_angle)
+            self.updateScene([self.sceneRect()])
         else:
             self.main_window.statusBar().showMessage('请选择你要旋转的图元')
 
@@ -133,6 +135,7 @@ class MyCanvas(QGraphicsView):
     def start_clip(self, algorithm: str):
         self.status = 'clipitem'
         self.temp_algorithm = algorithm
+        self.updateScene([self.sceneRect()])
 
     def do_clip(self):
         for eachitem in self.item_dict.values():
@@ -203,7 +206,6 @@ class MyCanvas(QGraphicsView):
                 self.setCursor(Qt.CrossCursor)
                 self.editstatus = area
                 self.editoriginpoint = [x, y]
-
         self.updateScene([self.sceneRect()])
         super().mousePressEvent(event)
 
@@ -379,27 +381,48 @@ class MyCanvas(QGraphicsView):
     def getPointArea(self, x: int, y: int) -> str:
         x_mid = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
         y_mid = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
-        if abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
-            return 'Scale1'
-        elif abs(x - x_mid) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
-            return 'Scale2'
-        elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
-            return 'Scale3'
-        elif abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - y_mid) <= 3:
-            return 'Scale4'
-        elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - y_mid) <= 3:
-            return 'Scale5'
-        elif abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
-            return 'Scale6'
-        elif abs(x - x_mid) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
-            return 'Scale7'
-        elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
-            return 'Scale8'
-        elif (x > self.temp_item.boundingrect[0] + 3 and x < self.temp_item.boundingrect[2] - 3
-                and y > self.temp_item.boundingrect[1] + 3 and y < self.temp_item.boundingrect[3] - 3):
-            return 'Translate'
+        if self.temp_item.item_type == 'line' and abs(self.temp_item.p_list[0][0] - self.temp_item.p_list[1][0]) <= 3:
+            # 垂直直线
+            if abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
+                return 'Scale2'
+            elif abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
+                return 'Scale7'
+            elif abs(x - self.temp_item.boundingrect[0]) <= 3 and y > self.temp_item.boundingrect[1] and y <  self.temp_item.boundingrect[3]:
+                return 'Translate'
+            else:
+                return 'Outer'
+        elif self.temp_item.item_type == 'line' and abs(self.temp_item.p_list[0][1] - self.temp_item.p_list[1][1]) <= 3:
+            #水平直线
+            if abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
+                return 'Scale4'
+            elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
+                return 'Scale5'
+            elif abs(y - self.temp_item.boundingrect[1]) <= 3 and x > self.temp_item.boundingrect[0] and x <  self.temp_item.boundingrect[2]:
+                return 'Translate'
+            else:
+                return 'Outer'
         else:
-            return 'Outer'
+            if abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
+                return 'Scale1'
+            elif abs(x - x_mid) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
+                return 'Scale2'
+            elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
+                return 'Scale3'
+            elif abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - y_mid) <= 3:
+                return 'Scale4'
+            elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - y_mid) <= 3:
+                return 'Scale5'
+            elif abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
+                return 'Scale6'
+            elif abs(x - x_mid) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
+                return 'Scale7'
+            elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
+                return 'Scale8'
+            elif (x > self.temp_item.boundingrect[0] and x < self.temp_item.boundingrect[2]
+                    and y > self.temp_item.boundingrect[1]  and y < self.temp_item.boundingrect[3] ):
+                return 'Translate'
+            else:
+                return 'Outer'
 
     # def getDegree(self, vec1, vec2):
     #     L1 = np.sqrt(vec1.dot(vec1))
@@ -756,20 +779,24 @@ class MainWindow(QMainWindow):
 
 
     def reset_canvas_action(self):
-        self.list_widget.itemClicked.disconnect(self.canvas_widget.selection_changed)
-        self.list_widget.clear() # clear之前必须解除槽函数和信号的connect
-        self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
-        self.item_cnt = 1
         text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width height')
         if ok:
+            self.list_widget.itemClicked.disconnect(self.canvas_widget.selection_changed)
+            self.list_widget.clear()  # clear之前必须解除槽函数和信号的connect
+            self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
+            self.item_cnt = 1
             text = text.strip().split(' ')
             self.canvas_widget.setFixedSize(int(text[0])+5, int(text[1])+5)
             self.scene.setSceneRect(0, 0, int(text[0]), int(text[1]))
-        self.canvas_widget.resetcanvas()
+            self.canvas_widget.resetcanvas()
         self.statusBar().showMessage('重置画布')
 
     def save_canvas_action(self):
-        filename,options = QFileDialog.getSaveFileName(self,"Save Image",os.getcwd()+"/GuiImg/","Images (*.png *.jpg *.bmp)")
+        folderpath = os.getcwd()+"/GuiImg"
+        folder = os.path.exists(folderpath)
+        if not folder :
+            os.makedirs(folderpath)
+        filename,options = QFileDialog.getSaveFileName(self,"Save Image",folderpath+"/","PNG(*.png);;JPG(*.jpg);;BMP(*.bmp)")
         if filename != '':
             pixMap = self.canvas_widget.grab()
             pixMap.save(filename)
