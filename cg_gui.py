@@ -14,11 +14,12 @@ from PyQt5.QtWidgets import (
     QGraphicsScene,
     QGraphicsView,
     QGraphicsItem,
+    QListWidgetItem,
     QListWidget,
     QHBoxLayout,
     QWidget,
     QStyleOptionGraphicsItem, QColorDialog, QInputDialog, QFileDialog)
-from PyQt5.QtGui import QPainter, QMouseEvent, QColor, QIcon, QPen
+from PyQt5.QtGui import QPainter, QMouseEvent, QColor, QIcon, QPen, QKeyEvent
 from PyQt5.QtCore import QRectF, QPoint, Qt
 
 
@@ -47,6 +48,7 @@ class MyCanvas(QGraphicsView):
         self.rotate_angle = 30
         self.clip_item = None
 
+        self.grabKeyboard()
 
     # 开始绘制操作
     def start_draw_line(self, algorithm, item_id):
@@ -150,6 +152,30 @@ class MyCanvas(QGraphicsView):
         self.status = ''
         self.temp_algorithm = ''
         self.clip_item = None
+
+    #键盘事件
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        if event.key() == Qt.Key_Backspace:
+            if self.selected_id != '':
+                #清空scene
+                self.scene().removeItem(self.item_dict[self.selected_id])
+                #清空侧边栏listwidget
+                items = self.list_widget.findItems(self.selected_id,Qt.MatchExactly)
+                row = self.list_widget.row(items[0])
+                self.list_widget.takeItem(row)
+                #清零选择
+                oldselected_id = self.selected_id#先保存旧值
+                self.list_widget.clearSelection()
+                self.clear_selection()
+                #清楚canvas item_dict
+                #该语句必须在clear_selection之后，否则会访问被该语句删除的地方
+                del self.item_dict[oldselected_id]
+
+                self.main_window.statusBar().showMessage('删除图元： %s' % oldselected_id)
+                self.updateScene([self.sceneRect()])
+                super().keyPressEvent(event)
+
+
 
     # 鼠标事件
     def mousePressEvent(self, event: QMouseEvent) -> None:
