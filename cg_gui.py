@@ -4,6 +4,7 @@ import copy
 import sys
 import os
 import time
+from math import sqrt
 
 import cg_algorithms as alg
 from typing import Optional
@@ -14,7 +15,6 @@ from PyQt5.QtWidgets import (
     QGraphicsScene,
     QGraphicsView,
     QGraphicsItem,
-    QListWidgetItem,
     QListWidget,
     QHBoxLayout,
     QWidget,
@@ -46,9 +46,10 @@ class MyCanvas(QGraphicsView):
         self.editstatus = ''
         self.editoriginpoint = []
         self.rotate_angle = 30
+        self.oldplist = []
+        self.oldbdrect = []
         self.clip_item = None
 
-        self.grabKeyboard()
 
     # 开始绘制操作
     def start_draw_line(self, algorithm, item_id):
@@ -82,6 +83,10 @@ class MyCanvas(QGraphicsView):
             self.selected_id = ''
         # 取消鼠标追踪
         self.setMouseTracking(False)
+        self.unsetCursor()
+        self.releaseKeyboard()
+        self.oldplist.clear()
+        self.oldbdrect.clear()
         self.main_window.statusBar().showMessage('')
 
     def selection_changed(self, selectedItem):
@@ -98,7 +103,11 @@ class MyCanvas(QGraphicsView):
 
         # 选中后进入编辑阶段，开始追踪鼠标移动的位置，并将当前item设为选中的item
         self.setMouseTracking(True)
+        self.grabKeyboard()
         self.temp_item = self.item_dict[selected]
+        self.oldplist = copy.deepcopy(self.temp_item.p_list)
+        self.oldbdrect = self.temp_item.boundingrect.copy()
+
 
     # 旋转操作
     def clockwise_rotate(self):
@@ -107,8 +116,8 @@ class MyCanvas(QGraphicsView):
                 self.main_window.statusBar().showMessage('椭圆图元只能旋转90°及其倍数, 当前角度: '+str(self.rotate_angle))
                 return
             self.main_window.statusBar().showMessage('顺时针旋转'+ str(self.rotate_angle) +'度')
-            xc = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
-            yc = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
+            xc = round((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
+            yc = round((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
             self.temp_item.p_list = alg.rotate(self.temp_item.p_list,xc,yc,self.rotate_angle)
             self.updateScene([self.sceneRect()])
         else:
@@ -120,8 +129,8 @@ class MyCanvas(QGraphicsView):
                 self.main_window.statusBar().showMessage('椭圆图元只能旋转90°及其倍数, 当前角度: '+str(self.rotate_angle))
                 return
             self.main_window.statusBar().showMessage('逆时针旋转'+ str(self.rotate_angle) +'度')
-            xc = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
-            yc = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
+            xc = round((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
+            yc = round((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
             self.temp_item.p_list = alg.rotate(self.temp_item.p_list,xc,yc,360 - self.rotate_angle)
             self.updateScene([self.sceneRect()])
         else:
@@ -176,12 +185,11 @@ class MyCanvas(QGraphicsView):
                 super().keyPressEvent(event)
 
 
-
     # 鼠标事件
     def mousePressEvent(self, event: QMouseEvent) -> None:
         pos = self.mapToScene(event.localPos().toPoint())
-        x = int(pos.x())
-        y = int(pos.y())
+        x = round(pos.x())
+        y = round(pos.y())
         if self.selected_id == '':
             if self.status == 'clipitem':
                 self.clip_item = MyItem('0', self.status, [[x, y], [x, y]], QColor(0,0,0))
@@ -219,6 +227,10 @@ class MyCanvas(QGraphicsView):
         else:
             area = self.getPointArea(x, y)
             if area == 'Translate':
+                self.setCursor(Qt.SizeAllCursor)
+                self.editstatus = area
+                self.editoriginpoint = [x, y]
+            elif area == 'Rotate':
                 self.setCursor(Qt.ClosedHandCursor)
                 self.editstatus = area
                 self.editoriginpoint = [x, y]
@@ -237,8 +249,8 @@ class MyCanvas(QGraphicsView):
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         pos = self.mapToScene(event.localPos().toPoint())
-        x = int(pos.x())
-        y = int(pos.y())
+        x = round(pos.x())
+        y = round(pos.y())
         if self.selected_id == '':
             if self.status == 'clipitem':
                 self.clip_item.p_list[1] = [x, y]
@@ -261,6 +273,8 @@ class MyCanvas(QGraphicsView):
             if self.editstatus == '':
                 area = self.getPointArea(x, y)
                 if area == 'Translate':
+                    self.setCursor(Qt.SizeAllCursor)
+                elif area == 'Rotate':
                     self.setCursor(Qt.OpenHandCursor)
                 elif area == 'Scale1' or area == 'Scale8':
                     self.setCursor(Qt.SizeFDiagCursor)
@@ -279,70 +293,89 @@ class MyCanvas(QGraphicsView):
                                                           y - self.editoriginpoint[1])
                     self.editoriginpoint[0] = x
                     self.editoriginpoint[1] = y
+                elif self.editstatus == 'Rotate':
+                    if self.temp_item.item_type == 'ellipse':
+                        self.main_window.statusBar().showMessage('不能通过拖动来实现椭圆的旋转。')
+                    else:
+                        #以width的长度来标定旋转角度
+                        xc = round((self.oldbdrect[0] + self.oldbdrect[2]) / 2)
+                        yc = round((self.oldbdrect[1] + self.oldbdrect[3]) / 2)
+                        angle_perlen = 180/(min(self.width() - 5 - xc,xc))
+                        angle =  (x - xc) * angle_perlen
+                        self.temp_item.p_list = alg.rotate(self.oldplist, xc, yc, round(angle))
                 elif self.editstatus == 'Scale1':
-                    xc,yc = self.temp_item.boundingrect[2], self.temp_item.boundingrect[3]
+                    xc,yc = self.oldbdrect[2], self.oldbdrect[3]
                     x = xc - 5 if xc - x < 5 else x
                     y = yc - 5 if yc - y < 5 else y
-                    sx = (xc - x)/(xc - self.temp_item.boundingrect[0])
-                    sy = (yc - y)/(yc - self.temp_item.boundingrect[1])
-                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1)
-                        and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1)):
-                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc,sx,sy)
+                    sx = (xc - x)/(xc - self.oldbdrect[0])
+                    sy = (yc - y)/(yc - self.oldbdrect[1])
+                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 5/(xc - self.oldbdrect[0]))
+                        and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 5/(yc - self.oldbdrect[1]))):
+                        self.temp_item.p_list = alg.scaleforgui(self.oldplist, xc, yc,sx,sy)
+
+                    # xc,yc = self.temp_item.boundingrect[2], self.temp_item.boundingrect[3]
+                    # x = xc - 5 if xc - x < 5 else x
+                    # y = yc - 5 if yc - y < 5 else y
+                    # sx = (xc - x)/(xc - self.temp_item.boundingrect[0])
+                    # sy = (yc - y)/(yc - self.temp_item.boundingrect[1])
+                    # if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1)
+                    #     and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1)):
+                    #     self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc,sx,sy)
                 elif self.editstatus == 'Scale2':
-                    xc = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
-                    yc = self.temp_item.boundingrect[3]
+                    xc = round((self.oldbdrect[0] + self.oldbdrect[2])/2)
+                    yc = self.oldbdrect[3]
                     y = yc - 5 if yc - y < 5 else y
-                    sy = (yc - y) / (yc - self.temp_item.boundingrect[1])
-                    if self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1:
-                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, 1, sy)
+                    sy = (yc - y) / (yc - self.oldbdrect[1])
+                    if self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 5/(yc - self.oldbdrect[1]):
+                        self.temp_item.p_list = alg.scaleforgui(self.oldplist, xc, yc, 1, sy)
                 elif self.editstatus == 'Scale3':
-                    xc, yc = self.temp_item.boundingrect[0], self.temp_item.boundingrect[3]
+                    xc, yc = self.oldbdrect[0], self.oldbdrect[3]
                     x = xc + 5 if x - xc < 5 else x
                     y = yc - 5 if yc - y < 5 else y
-                    sx = (xc - x) / (xc - self.temp_item.boundingrect[2])
-                    sy = (yc - y) / (yc - self.temp_item.boundingrect[1])
-                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1)
-                            and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1)):
-                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, sx, sy)
+                    sx = (xc - x) / (xc - self.oldbdrect[2])
+                    sy = (yc - y) / (yc - self.oldbdrect[1])
+                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 5/(xc - self.oldbdrect[2]))
+                            and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 5/(yc - self.oldbdrect[1]))):
+                        self.temp_item.p_list = alg.scaleforgui(self.oldplist, xc, yc, sx, sy)
                 elif self.editstatus == 'Scale4':
-                    xc = self.temp_item.boundingrect[2]
-                    yc = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
+                    xc = self.oldbdrect[2]
+                    yc = round((self.oldbdrect[1] + self.oldbdrect[3])/2)
                     x = xc - 5 if xc - x < 5 else x
-                    sx = (xc - x) / (xc - self.temp_item.boundingrect[0])
-                    if self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1:
-                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, sx, 1)
+                    sx = (xc - x) / (xc - self.oldbdrect[0])
+                    if self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 5/(xc - self.oldbdrect[0]):
+                        self.temp_item.p_list = alg.scaleforgui(self.oldplist, xc, yc, sx, 1)
                 elif self.editstatus == 'Scale5':
-                    xc = self.temp_item.boundingrect[0]
-                    yc = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3]) / 2)
+                    xc = self.oldbdrect[0]
+                    yc = round((self.oldbdrect[1] + self.oldbdrect[3]) / 2)
                     x = xc + 5 if x - xc < 5 else x
-                    sx = (xc - x) / (xc - self.temp_item.boundingrect[2])
-                    if self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1:
-                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, sx, 1)
+                    sx = (xc - x) / (xc - self.oldbdrect[2])
+                    if self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 5/(xc - self.oldbdrect[2]):
+                        self.temp_item.p_list = alg.scaleforgui(self.oldplist, xc, yc, sx, 1)
                 elif self.editstatus == 'Scale6':
-                    xc, yc = self.temp_item.boundingrect[2], self.temp_item.boundingrect[1]
+                    xc, yc = self.oldbdrect[2], self.oldbdrect[1]
                     x = xc - 5 if xc - x < 5 else x
                     y = yc + 5 if y - yc < 5 else y
-                    sx = (xc - x) / (xc - self.temp_item.boundingrect[0])
-                    sy = (yc - y) / (yc - self.temp_item.boundingrect[3])
-                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1)
-                            and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1)):
-                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, sx, sy)
+                    sx = (xc - x) / (xc - self.oldbdrect[0])
+                    sy = (yc - y) / (yc - self.oldbdrect[3])
+                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 5/(xc - self.oldbdrect[0]))
+                            and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 5/(yc - self.oldbdrect[3]))):
+                        self.temp_item.p_list = alg.scaleforgui(self.oldplist, xc, yc, sx, sy)
                 elif self.editstatus == 'Scale7':
-                    xc = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
-                    yc = self.temp_item.boundingrect[1]
+                    xc = round((self.oldbdrect[0]+ self.oldbdrect[2])/2)
+                    yc = self.oldbdrect[1]
                     y = yc + 5 if y - yc < 5 else y
-                    sy = (yc - y) / (yc - self.temp_item.boundingrect[3])
-                    if self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1:
-                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, 1, sy)
+                    sy = (yc - y) / (yc - self.oldbdrect[3])
+                    if self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 5/(yc - self.oldbdrect[3]):
+                        self.temp_item.p_list = alg.scaleforgui(self.oldplist, xc, yc, 1, sy)
                 elif self.editstatus == 'Scale8':
-                    xc,yc = self.temp_item.boundingrect[0], self.temp_item.boundingrect[1]
+                    xc,yc = self.oldbdrect[0],self.oldbdrect[1]
                     x = xc + 5 if x - xc < 5 else x
                     y = yc + 5 if y - yc < 5 else y
-                    sx = (xc - x) / (xc - self.temp_item.boundingrect[2])
-                    sy = (yc - y) / (yc - self.temp_item.boundingrect[3])
-                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 1)
-                            and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 1)):
-                        self.temp_item.p_list = alg.scaleforgui(self.temp_item.p_list, xc, yc, sx, sy)
+                    sx = (xc - x) / (xc - self.oldbdrect[2])
+                    sy = (yc - y) / (yc - self.oldbdrect[3])
+                    if ((self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] > 5 or sx >= 5/(xc - self.oldbdrect[2]))
+                            and (self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] > 5 or sy >= 5/(yc - self.oldbdrect[3]))):
+                        self.temp_item.p_list = alg.scaleforgui(self.oldplist, xc, yc, sx, sy)
                 else:
                     pass
         self.updateScene([self.sceneRect()])
@@ -365,7 +398,7 @@ class MyCanvas(QGraphicsView):
                 x1, y1 = self.temp_item.p_list[1]
                 self.temp_item.p_list[0] = [x0, max(y0, y1)]
                 self.temp_item.p_list[1] = [x1, max(y0, y1)]
-                self.temp_item.p_list.append([int((x0 + x1) / 2), min(y0, y1)])
+                self.temp_item.p_list.append([round((x0 + x1) / 2), min(y0, y1)])
                 self.item_dict[self.temp_id] = self.temp_item
                 self.list_widget.addItem(self.temp_id)
                 self.finish_draw()
@@ -392,6 +425,9 @@ class MyCanvas(QGraphicsView):
             self.unsetCursor()
             self.editstatus = ''
             self.editoriginpoint.clear()
+            #更新坐标点
+            self.oldplist = copy.deepcopy(self.temp_item.p_list)
+            self.oldbdrect = self.temp_item.boundingrect.copy()
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
@@ -405,8 +441,8 @@ class MyCanvas(QGraphicsView):
 
 
     def getPointArea(self, x: int, y: int) -> str:
-        x_mid = int((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
-        y_mid = int((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
+        x_mid = round((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
+        y_mid = round((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
         if self.temp_item.item_type == 'line' and abs(self.temp_item.p_list[0][0] - self.temp_item.p_list[1][0]) <= 3:
             # 垂直直线
             if abs(x - self.temp_item.boundingrect[0]) <= 3 and abs(y - self.temp_item.boundingrect[1]) <= 3:
@@ -444,23 +480,15 @@ class MyCanvas(QGraphicsView):
                 return 'Scale7'
             elif abs(x - self.temp_item.boundingrect[2]) <= 3 and abs(y - self.temp_item.boundingrect[3]) <= 3:
                 return 'Scale8'
+            elif (self.temp_item.boundingrect[2] - self.temp_item.boundingrect[0] >= 25 and self.temp_item.boundingrect[3] - self.temp_item.boundingrect[1] >= 25
+                    and sqrt((x - x_mid)**2 + (y - y_mid)**2) <= 10):
+                return 'Rotate'
             elif (x > self.temp_item.boundingrect[0] and x < self.temp_item.boundingrect[2]
                     and y > self.temp_item.boundingrect[1]  and y < self.temp_item.boundingrect[3] ):
                 return 'Translate'
             else:
                 return 'Outer'
 
-    # def getDegree(self, vec1, vec2):
-    #     L1 = np.sqrt(vec1.dot(vec1))
-    #     L2 = np.sqrt(vec2.dot(vec2))
-    #     cos_angle = vec1.dot(vec2) / (L1 * L2)
-    #     angle = np.degrees(np.arccos(cos_angle))
-    #     if np.cross(vec1,vec2) > 0:
-    #         # 相对于坐标系的逆时针
-    #         return -1*angle
-    #     else:
-    #         # 相对于坐标系的顺时针
-    #         return angle
 
     def resetcanvas(self):
         self.item_dict.clear()
@@ -502,9 +530,6 @@ class MyItem(QGraphicsItem):
         self.selected = False
         self.finish = finish
         self.boundingrect = [] # 记录图元外接矩形的左上角和右下角坐标[x_min,y_min,x_max,y_max]
-        # self.rotationcenter = []
-        # self.rotationR = 10 # 旋转标记的半径
-        # self.rotationP = [] # 旋转标记的圆心[xc,yc]
 
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = ...) -> None:
@@ -526,7 +551,7 @@ class MyItem(QGraphicsItem):
                 plist = []
                 plist.append([x0, max(y0,y1)])
                 plist.append([x1, max(y0,y1)])
-                plist.append([int((x0+x1)/2), min(y0,y1)])
+                plist.append([round((x0+x1)/2), min(y0,y1)])
                 item_pixels = alg.draw_polygon(plist,self.algorithm)
                 for p in item_pixels:
                     painter.setPen(QPen(self.color, 2))
@@ -583,7 +608,47 @@ class MyItem(QGraphicsItem):
 
     def selectedDraw(self, painter: QPainter):
         painter.setPen(QColor(255, 0, 0))
-        painter.drawRect(self.boundingRect())
+        #painter.drawRect(self.boundingRect())
+
+        if self.item_type == 'line' and abs(self.p_list[0][0] - self.p_list[1][0]) <= 3:
+            painter.drawRect(self.boundingRect())
+        elif self.item_type == 'line' and abs(self.p_list[0][1] - self.p_list[1][1]) <= 3:
+            painter.drawRect(self.boundingRect())
+        else:
+            self.boundingRect()
+            x_mid = (self.boundingrect[0] + self.boundingrect[2]) / 2
+            y_mid = (self.boundingrect[1] + self.boundingrect[3]) / 2
+            #scale1
+            painter.drawRect(QRectF(self.boundingrect[0] - 3, self.boundingrect[1] - 3, 6, 6))
+            painter.drawLine(self.boundingrect[0] + 3,self.boundingrect[1], x_mid-  3, self.boundingrect[1])
+            #scale2
+            painter.drawRect(QRectF(x_mid - 3, self.boundingrect[1] - 3, 6, 6))
+            painter.drawLine(x_mid + 3, self.boundingrect[1], self.boundingrect[2] - 3, self.boundingrect[1])
+            #scale3
+            painter.drawRect(QRectF(self.boundingrect[2] - 3, self.boundingrect[1] - 3, 6, 6))
+            painter.drawLine(self.boundingrect[2], self.boundingrect[1] + 3, self.boundingrect[2], y_mid - 3)
+            #scale4
+            painter.drawRect(QRectF(self.boundingrect[0] - 3, y_mid - 3, 6, 6))
+            painter.drawLine(self.boundingrect[2], y_mid + 3, self.boundingrect[2], self.boundingrect[3] - 3)
+            #scale5
+            painter.drawRect(QRectF(self.boundingrect[2] - 3, y_mid - 3, 6, 6))
+            painter.drawLine(self.boundingrect[2] - 3, self.boundingrect[3], x_mid + 3, self.boundingrect[3])
+            #scale6
+            painter.drawRect(QRectF(self.boundingrect[0] - 3, self.boundingrect[3] - 3, 6, 6))
+            painter.drawLine(x_mid - 3, self.boundingrect[3], self.boundingrect[0] + 3, self.boundingrect[3])
+            #scale7
+            painter.drawRect(QRectF(x_mid - 3, self.boundingrect[3] - 3, 6, 6))
+            painter.drawLine(self.boundingrect[0], self.boundingrect[3] - 3, self.boundingrect[0], y_mid + 3)
+            #scale8
+            painter.drawRect(QRectF(self.boundingrect[2] - 3, self.boundingrect[3] - 3, 6, 6))
+            painter.drawLine(self.boundingrect[0], y_mid - 3, self.boundingrect[0], self.boundingrect[1] + 3)
+
+
+            #rotate center
+            if self.boundingrect[2] - self.boundingrect[0] >= 25 and self.boundingrect[3] - self.boundingrect[1] >= 25 :
+                painter.setPen(QPen(QColor(255, 0, 0), 2, Qt.DashLine))
+                painter.drawEllipse(QPoint(x_mid,y_mid), 10,10)
+
 
         # x_mid = int((self.boundingrect[0] + self.boundingrect[2]) / 2)
         # if self.boundingrect[1] - 4 * self.rotationR < 0:
@@ -800,11 +865,13 @@ class MainWindow(QMainWindow):
 
     # 文件目录操作
     def set_pen_action(self):
+        self.canvas_widget.clear_selection()#目的是为了取消keyboard的grab
         self.canvas_widget.color = QColorDialog.getColor()
         self.statusBar().showMessage('设置画笔颜色')
 
 
     def reset_canvas_action(self):
+        self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
         text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width height')
         if ok:
             self.list_widget.itemClicked.disconnect(self.canvas_widget.selection_changed)
@@ -818,6 +885,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage('重置画布')
 
     def save_canvas_action(self):
+        self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
         folderpath = os.getcwd()+"/GuiImg"
         folder = os.path.exists(folderpath)
         if not folder :
