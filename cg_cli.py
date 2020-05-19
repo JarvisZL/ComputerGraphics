@@ -72,11 +72,11 @@ if __name__ == '__main__':
                 item_dict[item_id] = ['polygon', plist, algorithm, np.array(pen_color)]
             elif line[0] == 'drawEllipse':
                 item_id = line[1]
-                x0 = int(line[2])
-                y0 = int(line[3])
-                x1 = int(line[4])
-                y1 = int(line[5])
-                item_dict[item_id] = ['ellipse',[[x0, y0], [x1, y1]], ' ', np.array(pen_color)]
+                x_min = min(int(line[2]),int(line[4]))
+                x_max = max(int(line[2]),int(line[4]))
+                y_min = min(int(line[3]),int(line[5]))
+                y_max = max(int(line[3]), int(line[5]))
+                item_dict[item_id] = ['ellipse',[[x_min, y_min], [x_max, y_max]], ' ', np.array(pen_color)]
             elif line[0] == 'drawCurve':
                 item_id = line[1]
                 length = len(line)
@@ -100,7 +100,11 @@ if __name__ == '__main__':
                 plist = alg.scale(item_dict[line[1]][1],int(line[2]),int(line[3]),float(line[4]))
                 item_dict[line[1]][1] = plist
             elif line[0] == 'clip':
-                plist = alg.clip(item_dict[line[1]][1],int(line[2]),int(line[3]),int(line[4]),int(line[5]),line[6])
+                x_min = min(int(line[2]), int(line[4]))
+                x_max = max(int(line[2]), int(line[4]))
+                y_min = min(int(line[3]), int(line[5]))
+                y_max = max(int(line[3]), int(line[5]))
+                plist = alg.clip(item_dict[line[1]][1],x_min,y_min,x_max,y_max,line[6])
                 if plist == []:
                     del item_dict[line[1]]
                 else:
