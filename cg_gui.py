@@ -137,10 +137,12 @@ class MyCanvas(QGraphicsView):
             self.main_window.statusBar().showMessage('请选择你要旋转的图元')
 
     def set_rotate_angle(self):
+        self.clear_selection()
         text, ok = QInputDialog.getText(self, '请输入新的角度', '(0 <= angle <= 360)')
         if ok:
             self.rotate_angle = float(text)
             self.main_window.statusBar().showMessage('设置的角度为: '+text)
+
 
     # 裁剪操作
     def start_clip(self, algorithm: str):
@@ -988,7 +990,7 @@ class MainWindow(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon('./paint.png'))
+    app.setWindowIcon(QIcon('../Icon.png'))
     mw = MainWindow()
     mw.show()
     sys.exit(app.exec_())
