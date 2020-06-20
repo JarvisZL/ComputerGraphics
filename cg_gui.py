@@ -878,9 +878,9 @@ class MainWindow(QMainWindow):
         curve_b_spline_act.triggered.connect(self.curve_b_spline_action)
 
         #旋转目录
-        clockwise_act.triggered.connect(self.canvas_widget.clockwise_rotate)
-        anticlockwise_act.triggered.connect(self.canvas_widget.anticlockwise_rotate)
-        setangle_act.triggered.connect(self.canvas_widget.set_rotate_angle)
+        clockwise_act.triggered.connect(self.clockwise_rotate)
+        anticlockwise_act.triggered.connect(self.anticlockwise_rotate)
+        setangle_act.triggered.connect(self.set_rotate_angle)
 
         #裁剪目录
         clip_cohen_sutherland_act.triggered.connect(self.clip_cohen_sutherland_action)
@@ -955,6 +955,7 @@ class MainWindow(QMainWindow):
 
                 self.hbox_layout.replaceWidget(oldcavas, self.canvas_widget)
                 oldcavas.setParent(None)
+
                 self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
             self.statusBar().showMessage('重置画布')
         else:
@@ -1086,6 +1087,16 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('B-spline算法绘制曲线')
         else:
             self.statusBar().showMessage('请先完成当前绘制')
+
+    # 旋转操作
+    def clockwise_rotate(self):
+        self.canvas_widget.clockwise_rotate()
+
+    def anticlockwise_rotate(self):
+        self.canvas_widget.anticlockwise_rotate()
+
+    def set_rotate_angle(self):
+        self.canvas_widget.set_rotate_angle()
 
     #裁剪操作
     def clip_cohen_sutherland_action(self):
