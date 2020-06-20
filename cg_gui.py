@@ -40,6 +40,7 @@ class MyCanvas(QGraphicsView):
         self.temp_id = ''
         self.temp_item = None
         self.color = QColor(0, 0, 0)
+        self.pensize = 2
         self.painting = False # 多边形和曲线绘制过程中控制
         self.edgenum = 0 # 多边形和曲线绘制过程中控制
 
@@ -111,37 +112,46 @@ class MyCanvas(QGraphicsView):
 
     # 旋转操作
     def clockwise_rotate(self):
-        if self.selected_id != '':
-            if self.temp_item.item_type == 'ellipse' and self.rotate_angle % 90 != 0:
-                self.main_window.statusBar().showMessage('椭圆图元只能旋转90°及其倍数, 当前角度: '+str(self.rotate_angle))
-                return
-            self.main_window.statusBar().showMessage('顺时针旋转'+ str(self.rotate_angle) +'度')
-            xc = round((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
-            yc = round((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
-            self.temp_item.p_list = alg.rotate(self.temp_item.p_list,xc,yc,self.rotate_angle)
-            self.updateScene([self.sceneRect()])
+        if self.painting == True:
+            self.main_window.statusBar().showMessage('请完成当前绘制')
         else:
-            self.main_window.statusBar().showMessage('请选择你要旋转的图元')
+            if self.selected_id != '':
+                if self.temp_item.item_type == 'ellipse' and self.rotate_angle % 90 != 0:
+                    self.main_window.statusBar().showMessage('椭圆图元只能旋转90°及其倍数, 当前角度: '+str(self.rotate_angle))
+                    return
+                self.main_window.statusBar().showMessage('顺时针旋转'+ str(self.rotate_angle) +'度')
+                xc = round((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
+                yc = round((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
+                self.temp_item.p_list = alg.rotate(self.temp_item.p_list,xc,yc,self.rotate_angle)
+                self.updateScene([self.sceneRect()])
+            else:
+                self.main_window.statusBar().showMessage('请选择你要旋转的图元')
 
     def anticlockwise_rotate(self):
-        if self.selected_id != '':
-            if self.temp_item.item_type == 'ellipse' and self.rotate_angle % 90 != 0:
-                self.main_window.statusBar().showMessage('椭圆图元只能旋转90°及其倍数, 当前角度: '+str(self.rotate_angle))
-                return
-            self.main_window.statusBar().showMessage('逆时针旋转'+ str(self.rotate_angle) +'度')
-            xc = round((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
-            yc = round((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
-            self.temp_item.p_list = alg.rotate(self.temp_item.p_list,xc,yc,360 - self.rotate_angle)
-            self.updateScene([self.sceneRect()])
+        if self.painting == True:
+            self.main_window.statusBar().showMessage('请完成当前绘制')
         else:
-            self.main_window.statusBar().showMessage('请选择你要旋转的图元')
+            if self.selected_id != '':
+                if self.temp_item.item_type == 'ellipse' and self.rotate_angle % 90 != 0:
+                    self.main_window.statusBar().showMessage('椭圆图元只能旋转90°及其倍数, 当前角度: '+str(self.rotate_angle))
+                    return
+                self.main_window.statusBar().showMessage('逆时针旋转'+ str(self.rotate_angle) +'度')
+                xc = round((self.temp_item.boundingrect[0] + self.temp_item.boundingrect[2])/2)
+                yc = round((self.temp_item.boundingrect[1] + self.temp_item.boundingrect[3])/2)
+                self.temp_item.p_list = alg.rotate(self.temp_item.p_list,xc,yc,360 - self.rotate_angle)
+                self.updateScene([self.sceneRect()])
+            else:
+                self.main_window.statusBar().showMessage('请选择你要旋转的图元')
 
     def set_rotate_angle(self):
-        self.clear_selection()
-        text, ok = QInputDialog.getText(self, '请输入新的角度', '(0 <= angle <= 360)')
-        if ok:
-            self.rotate_angle = float(text)
-            self.main_window.statusBar().showMessage('设置的角度为: '+text)
+        if self.painting == True:
+            self.main_window.statusBar().showMessage('请完成当前绘制')
+        else:
+            self.clear_selection()
+            text, ok = QInputDialog.getText(self, '请输入新的角度', '(0 <= angle <= 360)')
+            if ok:
+                self.rotate_angle = float(text)
+                self.main_window.statusBar().showMessage('设置的角度为: '+text)
 
 
     # 裁剪操作
@@ -194,20 +204,20 @@ class MyCanvas(QGraphicsView):
         y = round(pos.y())
         if self.selected_id == '':
             if self.status == 'clipitem':
-                self.clip_item = MyItem('0', self.status, [[x, y], [x, y]], QColor(0,0,0))
+                self.clip_item = MyItem('0', self.status, [[x, y], [x, y]], QPen(self.color, self.pensize))
                 self.scene().addItem(self.clip_item)
             elif self.status == 'line':
-                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
+                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], QPen(self.color,self.pensize), self.temp_algorithm)
                 self.scene().addItem(self.temp_item)
             elif self.status == 'triangle':
-                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm,False)
+                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], QPen(self.color,self.pensize), self.temp_algorithm,False)
                 self.scene().addItem(self.temp_item)
             elif self.status == 'rectangle':
-                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y], [x, y], [x, y]], self.color, self.temp_algorithm)
+                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y], [x, y], [x, y]], QPen(self.color,self.pensize), self.temp_algorithm)
                 self.scene().addItem(self.temp_item)
             elif self.status == 'otherpolygon':
                 if self.painting == False:
-                    self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm)
+                    self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], QPen(self.color,self.pensize), self.temp_algorithm)
                     self.scene().addItem(self.temp_item)
                     self.edgenum = 1
                     self.painting = True
@@ -215,11 +225,11 @@ class MyCanvas(QGraphicsView):
                     self.edgenum = self.edgenum + 1
                     self.temp_item.p_list.append([x, y])
             elif self.status == 'ellipse':
-                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color)
+                self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], QPen(self.color,self.pensize))
                 self.scene().addItem(self.temp_item)
             elif self.status == 'curve':
                 if self.painting == False:
-                    self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.color, self.temp_algorithm, False)
+                    self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], QPen(self.color,self.pensize), self.temp_algorithm, False)
                     self.scene().addItem(self.temp_item)
                     self.edgenum = 1
                     self.painting = True
@@ -500,6 +510,7 @@ class MyCanvas(QGraphicsView):
         self.temp_id = ''
         self.temp_item = None
         self.color = QColor(0,0,0)
+        self.pensize = 2
         self.painting = False
         self.edgenum = 0
         for item in self.scene().items():
@@ -511,7 +522,7 @@ class MyItem(QGraphicsItem):
     自定义图元类，继承自QGraphicsItem
     """
 
-    def __init__(self, item_id: str, item_type: str, p_list: list, color: QColor, algorithm: str = '', finish: bool = False,
+    def __init__(self, item_id: str, item_type: str, p_list: list, pen: QPen, algorithm: str = '', finish: bool = False,
                  parent: QGraphicsItem = None):
         """
 
@@ -527,7 +538,7 @@ class MyItem(QGraphicsItem):
         self.id = item_id  # 图元ID
         self.item_type = item_type  # 图元类型，'line'、'polygon'、'ellipse'、'curve'等
         self.p_list = p_list  # 图元参数
-        self.color = color  # 画笔颜色
+        self.pen = pen  # 画笔颜色
         self.algorithm = algorithm  # 绘制算法，'DDA'、'Bresenham'、'Bezier'、'B-spline'等
         self.selected = False
         self.finish = finish
@@ -536,12 +547,12 @@ class MyItem(QGraphicsItem):
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = ...) -> None:
         if self.item_type == 'clipitem':
-            painter.setPen(QPen(self.color, 2, Qt.DotLine))
+            painter.setPen(QPen(QColor(0,0,0), 2, Qt.DotLine))
             painter.drawRect(self.boundingRect())
         elif self.item_type == 'line':
             item_pixels = alg.draw_line(self.p_list, self.algorithm)
             for p in item_pixels:
-                painter.setPen(QPen(self.color,2))
+                painter.setPen(self.pen)
                 painter.drawPoint(*p)
             if self.selected:
                 self.selectedDraw(painter)
@@ -556,28 +567,28 @@ class MyItem(QGraphicsItem):
                 plist.append([round((x0+x1)/2), min(y0,y1)])
                 item_pixels = alg.draw_polygon(plist,self.algorithm)
                 for p in item_pixels:
-                    painter.setPen(QPen(self.color, 2))
+                    painter.setPen(self.pen)
                     painter.drawPoint(*p)
                 if self.selected:
                     self.selectedDraw(painter)
             else:
                 item_pixels = alg.draw_polygon(self.p_list, self.algorithm)
                 for p in item_pixels:
-                    painter.setPen(QPen(self.color, 2))
+                    painter.setPen(self.pen)
                     painter.drawPoint(*p)
                 if self.selected:
                     self.selectedDraw(painter)
         elif self.item_type == 'rectangle':
             item_pixels = alg.draw_polygon(self.p_list, self.algorithm)
             for p in item_pixels:
-                painter.setPen(QPen(self.color,2))
+                painter.setPen(self.pen)
                 painter.drawPoint(*p)
             if self.selected:
                 self.selectedDraw(painter)
         elif self.item_type == 'otherpolygon':
             item_pixels = alg.draw_multilines(self.p_list, self.algorithm)
             for p in item_pixels:
-                painter.setPen(QPen(self.color,2))
+                painter.setPen(self.pen)
                 painter.drawPoint(*p)
             if self.selected:
                 self.selectedDraw(painter)
@@ -589,7 +600,7 @@ class MyItem(QGraphicsItem):
             plist.append([max(x0, x1), max(y0, y1)])
             item_pixels = alg.draw_ellipse(plist)
             for p in item_pixels:
-                painter.setPen(QPen(self.color,2))
+                painter.setPen(self.pen)
                 painter.drawPoint(*p)
             if self.selected:
                 self.selectedDraw(painter)
@@ -597,12 +608,12 @@ class MyItem(QGraphicsItem):
             if self.finish == False:
                 item_pixels = alg.draw_multilines(self.p_list, 'DDA')
                 for p in item_pixels:
-                    painter.setPen(self.color)
+                    painter.setPen(self.pen)
                     painter.drawPoint(*p)
             else:
                 item_pixels = alg.draw_curve(self.p_list, self.algorithm)
                 for p in item_pixels:
-                    painter.setPen(QPen(self.color,2))
+                    painter.setPen(self.pen)
                     painter.drawPoint(*p)
                 if self.selected:
                     self.selectedDraw(painter)
@@ -774,7 +785,8 @@ class MainWindow(QMainWindow):
         # 设置菜单栏
         menubar = self.menuBar()
         file_menu = menubar.addMenu('文件')
-        set_pen_act = file_menu.addAction('设置画笔')
+        set_pen_act = file_menu.addAction('设置画笔颜色')
+        set_pensize_act = file_menu.addAction('设置画笔粗细')
         reset_canvas_act = file_menu.addAction('重置画布')
         save_canvas_act = file_menu.addAction('保存画布')
         exit_act = file_menu.addAction('退出')
@@ -814,6 +826,7 @@ class MainWindow(QMainWindow):
         # 连接信号和槽函数
         # 文件目录
         set_pen_act.triggered.connect(self.set_pen_action)
+        set_pensize_act.triggered.connect(self.set_pensize_action)
         reset_canvas_act.triggered.connect(self.reset_canvas_action)
         save_canvas_act.triggered.connect(self.save_canvas_action)
         exit_act.triggered.connect(qApp.quit)
@@ -867,125 +880,185 @@ class MainWindow(QMainWindow):
 
     # 文件目录操作
     def set_pen_action(self):
-        self.canvas_widget.clear_selection()#目的是为了取消keyboard的grab
-        self.canvas_widget.color = QColorDialog.getColor()
-        self.statusBar().showMessage('设置画笔颜色')
+        if self.canvas_widget.painting == False:
+            self.canvas_widget.clear_selection()#目的是为了取消keyboard的grab
+            self.canvas_widget.color = QColorDialog.getColor()
+            self.statusBar().showMessage('设置画笔颜色')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
+    def set_pensize_action(self):
+        if self.canvas_widget.painting == False:
+            self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
+            size, ok = QInputDialog.getText(self,'请输入新的笔的粗细','1 <= size <= 10')
+            if ok:
+                self.canvas_widget.pensize = int(size)
+            self.statusBar().showMessage('设置画笔粗细')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def reset_canvas_action(self):
-        self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
-        text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width height')
-        if ok:
-            self.list_widget.itemClicked.disconnect(self.canvas_widget.selection_changed)
-            self.list_widget.clear()  # clear之前必须解除槽函数和信号的connect
-            self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
-            self.item_cnt = 1
-            text = text.strip().split(' ')
-            self.canvas_widget.setFixedSize(int(text[0])+5, int(text[1])+5)
-            self.scene.setSceneRect(0, 0, int(text[0]), int(text[1]))
-            self.canvas_widget.resetcanvas()
-        self.statusBar().showMessage('重置画布')
+        if self.canvas_widget.painting == False:
+            self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
+            text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width height')
+            if ok:
+                self.list_widget.itemClicked.disconnect(self.canvas_widget.selection_changed)
+                self.list_widget.clear()  # clear之前必须解除槽函数和信号的connect
+                self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
+                self.item_cnt = 1
+                text = text.strip().split(' ')
+                self.canvas_widget.setFixedSize(int(text[0])+5, int(text[1])+5)
+                self.scene.setSceneRect(0, 0, int(text[0]), int(text[1]))
+                self.canvas_widget.resetcanvas()
+            self.statusBar().showMessage('重置画布')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def save_canvas_action(self):
-        self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
-        folderpath = os.getcwd()+"/GuiImg"
-        folder = os.path.exists(folderpath)
-        if not folder :
-            os.makedirs(folderpath)
-        filename,options = QFileDialog.getSaveFileName(self,"Save Image",folderpath+"/","PNG(*.png);;JPG(*.jpg);;BMP(*.bmp)")
-        if filename != '':
-            pixMap = self.canvas_widget.grab()
-            pixMap.save(filename)
-        self.statusBar().showMessage('保存图片: '+filename)
+        if self.canvas_widget.painting == False:
+            self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
+            folderpath = os.getcwd()+"/GuiImg"
+            folder = os.path.exists(folderpath)
+            if not folder :
+                os.makedirs(folderpath)
+            filename,options = QFileDialog.getSaveFileName(self,"Save Image",folderpath+"/","PNG(*.png);;JPG(*.jpg);;BMP(*.bmp)")
+            if filename != '':
+                pixMap = self.canvas_widget.grab()
+                pixMap.save(filename)
+            self.statusBar().showMessage('保存图片: '+filename)
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     # 绘制目录操作 - 直线
     def line_naive_action(self):
-        self.canvas_widget.start_draw_line('Naive', self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('Naive算法绘制线段')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_draw_line('Naive', self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('Naive算法绘制线段')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def line_dda_action(self):
-        self.canvas_widget.start_draw_line('DDA', self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('DDA算法绘制线段')
+        if self.canvas_widget.painting == False:
+            self.canvas_widget.start_draw_line('DDA', self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('DDA算法绘制线段')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def line_bresenham_action(self):
-        self.canvas_widget.start_draw_line('Bresenham', self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('Bresenham算法绘制线段')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_draw_line('Bresenham', self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('Bresenham算法绘制线段')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     # 绘制目录操作 - 多边形
     def triangle_dda_action(self):
-        self.canvas_widget.start_draw_polygon('triangle', 'DDA', self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('DDA算法绘制三角形')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_draw_polygon('triangle', 'DDA', self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('DDA算法绘制三角形')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def triangle_bresenham_action(self):
-        self.canvas_widget.start_draw_polygon('triangle', 'Bresenham', self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('Bresenham算法绘制三角形')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_draw_polygon('triangle', 'Bresenham', self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('Bresenham算法绘制三角形')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def rectangle_dda_action(self):
-        self.canvas_widget.start_draw_polygon('rectangle', 'DDA', self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('DDA算法绘制矩形')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_draw_polygon('rectangle', 'DDA', self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('DDA算法绘制矩形')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def rectangle_bresenham_action(self):
-        self.canvas_widget.start_draw_polygon('rectangle', 'Bresenham', self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('Bresenham算法绘制矩形')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_draw_polygon('rectangle', 'Bresenham', self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('Bresenham算法绘制矩形')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def otherpolygon_dda_action(self):
-        self.canvas_widget.start_draw_polygon('otherpolygon', 'DDA', self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('DDA算法绘制自定义多边形')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_draw_polygon('otherpolygon', 'DDA', self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('DDA算法绘制自定义多边形')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def otherpolygon_bresenham_action(self):
-        self.canvas_widget.start_draw_polygon('otherpolygon', 'Bresenham', self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('Bresenham算法绘制自定义多边形')
+        if self.canvas_widget.painting == False:
+            self.canvas_widget.start_draw_polygon('otherpolygon', 'Bresenham', self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('Bresenham算法绘制自定义多边形')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     # 绘制目录操作 - 椭圆
     def ellipse_action(self):
-        self.canvas_widget.start_draw_ellipse(self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('绘制椭圆')
+        if self.canvas_widget.painting == False:
+            self.canvas_widget.start_draw_ellipse(self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('绘制椭圆')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     # 绘制目录操作 - 曲线
     def curve_bezier_actiton(self):
-        self.canvas_widget.start_draw_curve('Bezier',self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('Bezier算法绘制曲线')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_draw_curve('Bezier',self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('Bezier算法绘制曲线')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def curve_b_spline_action(self):
-        self.canvas_widget.start_draw_curve('B-spline',self.get_id())
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('B-spline算法绘制曲线')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_draw_curve('B-spline',self.get_id())
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('B-spline算法绘制曲线')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     #裁剪操作
     def clip_cohen_sutherland_action(self):
-        self.canvas_widget.start_clip('Cohen-Sutherland')
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('cohen_sutherland算法裁剪线段')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_clip('Cohen-Sutherland')
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('cohen_sutherland算法裁剪线段')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
     def clip_liang_barsky_action(self):
-        self.canvas_widget.start_clip('Liang-Barsky')
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
-        self.statusBar().showMessage('liang_barsky算法裁剪线段')
+        if self.canvas_widget.painting == False :
+            self.canvas_widget.start_clip('Liang-Barsky')
+            self.list_widget.clearSelection()
+            self.canvas_widget.clear_selection()
+            self.statusBar().showMessage('liang_barsky算法裁剪线段')
+        else:
+            self.statusBar().showMessage('请先完成当前绘制')
 
 
 if __name__ == '__main__':
