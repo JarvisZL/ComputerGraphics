@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QWidget,
     QStyleOptionGraphicsItem, QColorDialog, QInputDialog, QFileDialog)
-from PyQt5.QtGui import QPainter, QMouseEvent, QColor, QIcon, QPen, QKeyEvent
+from PyQt5.QtGui import QPainter, QMouseEvent, QColor, QIcon, QPen, QKeyEvent, QTransform
 from PyQt5.QtCore import QRectF, QPoint, Qt
 
 
@@ -74,9 +74,11 @@ class MyCanvas(QGraphicsView):
 
     # 绘制结束
     def finish_draw(self):
-        self.temp_id = self.main_window.get_id()
+        #self.temp_id = self.main_window.get_id()
+        self.status = ''
         self.painting = False
         self.edgenum = 0
+        self.click_selection(self.temp_item)
 
     def clear_selection(self):
         if self.selected_id != '':
@@ -106,6 +108,27 @@ class MyCanvas(QGraphicsView):
         self.setMouseTracking(True)
         self.grabKeyboard()
         self.temp_item = self.item_dict[selected]
+        self.oldplist = copy.deepcopy(self.temp_item.p_list)
+        self.oldbdrect = self.temp_item.boundingrect.copy()
+
+    def click_selection(self, selecteditem):
+        if selecteditem  == None:
+            return
+        print(selecteditem.p_list)
+        self.main_window.statusBar().showMessage('图元选择: %s' % selecteditem.id)
+        if self.selected_id != '':
+            self.item_dict[self.selected_id].selected = False
+            self.item_dict[self.selected_id].update()
+        self.selected_id = selecteditem.id
+        self.item_dict[selecteditem.id].selected = True
+        self.item_dict[selecteditem.id].update()  # 调用paint
+        self.status = ''
+        self.updateScene([self.sceneRect()])  # 调用paint
+
+        # 选中后进入编辑阶段，开始追踪鼠标移动的位置，并将当前item设为选中的item
+        self.setMouseTracking(True)
+        self.grabKeyboard()
+        self.temp_item = self.item_dict[selecteditem.id]
         self.oldplist = copy.deepcopy(self.temp_item.p_list)
         self.oldbdrect = self.temp_item.boundingrect.copy()
 
@@ -150,6 +173,9 @@ class MyCanvas(QGraphicsView):
             self.clear_selection()
             text, ok = QInputDialog.getText(self, '请输入新的角度', '(0 <= angle <= 360)')
             if ok:
+                if float(text) < 0 or float(text) > 360:
+                    self.main_window.statusBar().showMessage('您的输入不符合要求')
+                    return
                 self.rotate_angle = float(text)
                 self.main_window.statusBar().showMessage('设置的角度为: '+text)
 
@@ -196,6 +222,11 @@ class MyCanvas(QGraphicsView):
                 self.updateScene([self.sceneRect()])
                 super().keyPressEvent(event)
 
+    def onlyonepoint(self):
+        if len(self.temp_item.p_list) == 2:
+            if self.temp_item.p_list[0][0] == self.temp_item.p_list[1][0] and self.temp_item.p_list[0][1] == self.temp_item.p_list[1][1]:
+                return True
+        return False
 
     # 鼠标事件
     def mousePressEvent(self, event: QMouseEvent) -> None:
@@ -203,7 +234,9 @@ class MyCanvas(QGraphicsView):
         x = round(pos.x())
         y = round(pos.y())
         if self.selected_id == '':
-            if self.status == 'clipitem':
+            if self.status == '':
+                self.click_selection(self.scene().itemAt(pos.x(), pos.y(), QTransform()))
+            elif self.status == 'clipitem':
                 self.clip_item = MyItem('0', self.status, [[x, y], [x, y]], QPen(self.color, self.pensize))
                 self.scene().addItem(self.clip_item)
             elif self.status == 'line':
@@ -237,25 +270,30 @@ class MyCanvas(QGraphicsView):
                     self.edgenum = self.edgenum + 1
                     self.temp_item.p_list.append([x, y])
         else:
-            area = self.getPointArea(x, y)
-            if area == 'Translate':
+            if self.onlyonepoint() == True:
                 self.setCursor(Qt.SizeAllCursor)
-                self.editstatus = area
+                self.editstatus = 'Translate'
                 self.editoriginpoint = [x, y]
-            elif area == 'Rotate':
-                self.setCursor(Qt.ClosedHandCursor)
-                self.editstatus = area
-                self.editoriginpoint = [x, y]
-            elif area == 'Outer':
-                self.unsetCursor()
-                self.editstatus = ''
-                self.editoriginpoint.clear()
-                self.main_window.list_widget.clearSelection()
-                self.clear_selection()
             else:
-                self.setCursor(Qt.CrossCursor)
-                self.editstatus = area
-                self.editoriginpoint = [x, y]
+                area = self.getPointArea(x, y)
+                if area == 'Translate':
+                    self.setCursor(Qt.SizeAllCursor)
+                    self.editstatus = area
+                    self.editoriginpoint = [x, y]
+                elif area == 'Rotate':
+                    self.setCursor(Qt.ClosedHandCursor)
+                    self.editstatus = area
+                    self.editoriginpoint = [x, y]
+                elif area == 'Outer':
+                    self.unsetCursor()
+                    self.editstatus = ''
+                    self.editoriginpoint.clear()
+                    self.main_window.list_widget.clearSelection()
+                    self.clear_selection()
+                else:
+                    self.setCursor(Qt.CrossCursor)
+                    self.editstatus = area
+                    self.editoriginpoint = [x, y]
         self.updateScene([self.sceneRect()])
         super().mousePressEvent(event)
 
@@ -283,21 +321,24 @@ class MyCanvas(QGraphicsView):
         else:
             # 并未处在edit状态中
             if self.editstatus == '':
-                area = self.getPointArea(x, y)
-                if area == 'Translate':
+                if self.onlyonepoint() == True:
                     self.setCursor(Qt.SizeAllCursor)
-                elif area == 'Rotate':
-                    self.setCursor(Qt.OpenHandCursor)
-                elif area == 'Scale1' or area == 'Scale8':
-                    self.setCursor(Qt.SizeFDiagCursor)
-                elif area == 'Scale2' or area == 'Scale7':
-                    self.setCursor(Qt.SizeVerCursor)
-                elif area == 'Scale3' or area == 'Scale6':
-                    self.setCursor(Qt.SizeBDiagCursor)
-                elif area == 'Scale4' or area == 'Scale5':
-                    self.setCursor(Qt.SizeHorCursor)
                 else:
-                    self.unsetCursor()
+                    area = self.getPointArea(x, y)
+                    if area == 'Translate':
+                        self.setCursor(Qt.SizeAllCursor)
+                    elif area == 'Rotate':
+                        self.setCursor(Qt.OpenHandCursor)
+                    elif area == 'Scale1' or area == 'Scale8':
+                        self.setCursor(Qt.SizeFDiagCursor)
+                    elif area == 'Scale2' or area == 'Scale7':
+                        self.setCursor(Qt.SizeVerCursor)
+                    elif area == 'Scale3' or area == 'Scale6':
+                        self.setCursor(Qt.SizeBDiagCursor)
+                    elif area == 'Scale4' or area == 'Scale5':
+                        self.setCursor(Qt.SizeHorCursor)
+                    else:
+                        self.unsetCursor()
             # 正在edit状态中
             else:
                 if self.editstatus == 'Translate':
@@ -419,14 +460,15 @@ class MyCanvas(QGraphicsView):
                 self.list_widget.addItem(self.temp_id)
                 self.finish_draw()
             elif self.status == 'otherpolygon':
-                xf, yf = self.temp_item.p_list[self.edgenum]
-                xb, yb = self.temp_item.p_list[0]
-                if (xf - xb) ** 2 + (yf - yb) ** 2 <= 25:
-                    self.temp_item.p_list[self.edgenum] = [xb, yb]
-                    self.updateScene([self.sceneRect()])
-                    self.item_dict[self.temp_id] = self.temp_item
-                    self.list_widget.addItem(self.temp_id)
-                    self.finish_draw()
+                if self.edgenum > 2:
+                    xf, yf = self.temp_item.p_list[self.edgenum]
+                    xb, yb = self.temp_item.p_list[0]
+                    if (xf - xb) ** 2 + (yf - yb) ** 2 <= 25:
+                        self.temp_item.p_list[self.edgenum] = [xb, yb]
+                        self.updateScene([self.sceneRect()])
+                        self.item_dict[self.temp_id] = self.temp_item
+                        self.list_widget.addItem(self.temp_id)
+                        self.finish_draw()
             elif self.status == 'ellipse':
                 self.item_dict[self.temp_id] = self.temp_item
                 self.list_widget.addItem(self.temp_id)
@@ -445,11 +487,12 @@ class MyCanvas(QGraphicsView):
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         if self.selected_id == '':
             if self.status == 'curve':
-                self.temp_item.finish = True
-                self.item_dict[self.temp_id] = self.temp_item
-                self.list_widget.addItem(self.temp_id)
-                self.finish_draw()
-                self.updateScene([self.sceneRect()])
+                if self.painting == True:
+                    self.temp_item.finish = True
+                    self.item_dict[self.temp_id] = self.temp_item
+                    self.list_widget.addItem(self.temp_id)
+                    self.finish_draw()
+                    self.updateScene([self.sceneRect()])
 
 
     def getPointArea(self, x: int, y: int) -> str:
@@ -501,20 +544,6 @@ class MyCanvas(QGraphicsView):
             else:
                 return 'Outer'
 
-
-    def resetcanvas(self):
-        self.item_dict.clear()
-        self.selected_id = ''
-        self.status = ''
-        self.temp_algorithm = ''
-        self.temp_id = ''
-        self.temp_item = None
-        self.color = QColor(0,0,0)
-        self.pensize = 2
-        self.painting = False
-        self.edgenum = 0
-        for item in self.scene().items():
-            self.scene().removeItem(item)
 
 
 class MyItem(QGraphicsItem):
@@ -890,8 +919,11 @@ class MainWindow(QMainWindow):
     def set_pensize_action(self):
         if self.canvas_widget.painting == False:
             self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
-            size, ok = QInputDialog.getText(self,'请输入新的笔的粗细','1 <= size <= 10')
+            size, ok = QInputDialog.getText(self,'请输入新的笔的粗细','1 <= size <= 10（默认为2)')
             if ok:
+                if int(size) < 1 or int(size) > 10:
+                    self.statusBar().showMessage('您输入的数值不符合要求')
+                    return
                 self.canvas_widget.pensize = int(size)
             self.statusBar().showMessage('设置画笔粗细')
         else:
@@ -902,14 +934,28 @@ class MainWindow(QMainWindow):
             self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
             text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width height')
             if ok:
+                text = text.strip().split(' ')
+                if len(text) != 2:
+                    self.statusBar().showMessage('您的输入不符合要求')
+                    return
+                if int(text[0]) < 100 or int(text[0]) > 1000 or int(text[1]) < 100 or int(text[1]) > 1000 :
+                    self.statusBar().showMessage('您的输入不符合要求')
+                    return
                 self.list_widget.itemClicked.disconnect(self.canvas_widget.selection_changed)
                 self.list_widget.clear()  # clear之前必须解除槽函数和信号的connect
-                self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
                 self.item_cnt = 1
-                text = text.strip().split(' ')
-                self.canvas_widget.setFixedSize(int(text[0])+5, int(text[1])+5)
+
+                self.scene = QGraphicsScene(self)
                 self.scene.setSceneRect(0, 0, int(text[0]), int(text[1]))
-                self.canvas_widget.resetcanvas()
+                oldcavas = self.canvas_widget
+                self.canvas_widget = MyCanvas(self.scene, self)
+                self.canvas_widget.setFixedSize(int(text[0])+5, int(text[1])+5)
+                self.canvas_widget.main_window = self
+                self.canvas_widget.list_widget = self.list_widget
+
+                self.hbox_layout.replaceWidget(oldcavas, self.canvas_widget)
+                oldcavas.setParent(None)
+                self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
             self.statusBar().showMessage('重置画布')
         else:
             self.statusBar().showMessage('请先完成当前绘制')
