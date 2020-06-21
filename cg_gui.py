@@ -106,7 +106,7 @@ class MyCanvas(QGraphicsView):
 
         # 选中后进入编辑阶段，开始追踪鼠标移动的位置，并将当前item设为选中的item
         self.setMouseTracking(True)
-        self.grabKeyboard()
+        #self.grabKeyboard()
         self.temp_item = self.item_dict[selected]
         self.oldplist = copy.deepcopy(self.temp_item.p_list)
         self.oldbdrect = self.temp_item.boundingrect.copy()
@@ -126,7 +126,7 @@ class MyCanvas(QGraphicsView):
 
         # 选中后进入编辑阶段，开始追踪鼠标移动的位置，并将当前item设为选中的item
         self.setMouseTracking(True)
-        self.grabKeyboard()
+        #self.grabKeyboard()
         self.temp_item = self.item_dict[selecteditem.id]
         self.oldplist = copy.deepcopy(self.temp_item.p_list)
         self.oldbdrect = self.temp_item.boundingrect.copy()
@@ -950,7 +950,7 @@ class MainWindow(QMainWindow):
     # 文件目录操作
     def set_pen_action(self):
         if self.canvas_widget.painting == False:
-            self.canvas_widget.clear_selection()#目的是为了取消keyboard的grab
+            #self.canvas_widget.clear_selection()#目的是为了取消keyboard的grab
             color = QColorDialog.getColor()
             if color.isValid():
                 self.canvas_widget.color = color
@@ -962,7 +962,7 @@ class MainWindow(QMainWindow):
 
     def set_pensize_action(self):
         if self.canvas_widget.painting == False:
-            self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
+            #self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
             size, ok = QInputDialog.getText(self,'请输入新的笔的粗细','1 <= size <= 10（默认为2)')
             if ok:
                 if int(size) < 1 or int(size) > 10:
@@ -975,7 +975,7 @@ class MainWindow(QMainWindow):
 
     def reset_canvas_action(self):
         if self.canvas_widget.painting == False:
-            self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
+            #self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
             text, ok = QInputDialog.getText(self, '请输入新的宽和高', '格式(100 <= width,height <=1000): width height')
             if ok:
                 text = text.strip().split(' ')
@@ -1007,7 +1007,7 @@ class MainWindow(QMainWindow):
 
     def save_canvas_action(self):
         if self.canvas_widget.painting == False:
-            self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
+            #self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
             folderpath = os.getcwd()+"/GuiImg"
             folder = os.path.exists(folderpath)
             if not folder :
@@ -1173,7 +1173,7 @@ class MainWindow(QMainWindow):
 
     def pencolor_change_action(self):
         if self.canvas_widget.selected_id != '':
-            self.canvas_widget.clear_selection()#目的是为了取消keyboard的grab
+            #self.canvas_widget.clear_selection()#目的是为了取消keyboard的grab
             oldpen = self.canvas_widget.temp_item.pen
             color = QColorDialog.getColor()
             if color.isValid():
@@ -1186,7 +1186,7 @@ class MainWindow(QMainWindow):
 
     def pensize_change_action(self):
         if self.canvas_widget.selected_id != '':
-            self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
+            #self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
             size, ok = QInputDialog.getText(self, '请输入新的笔的粗细', '1 <= size <= 10（默认为2)')
             if ok:
                 if int(size) < 1 or int(size) > 10:
