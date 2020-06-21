@@ -75,7 +75,6 @@ class MyCanvas(QGraphicsView):
 
     # 绘制结束
     def finish_draw(self):
-        #self.temp_id = self.main_window.get_id()
         self.status = ''
         self.painting = False
         self.edgenum = 0
@@ -113,7 +112,7 @@ class MyCanvas(QGraphicsView):
         self.oldbdrect = self.temp_item.boundingrect.copy()
 
     def click_selection(self, selecteditem):
-        if selecteditem  == None:
+        if selecteditem is None:
             return
         self.main_window.statusBar().showMessage('图元选择: %s' % selecteditem.id)
         if self.selected_id != '':
@@ -200,69 +199,52 @@ class MyCanvas(QGraphicsView):
         self.temp_algorithm = ''
         self.clip_item = None
 
-    #键盘事件
-    def keyPressEvent(self, event: QKeyEvent) -> None:
-        if event.key() == Qt.Key_Backspace:
-            if self.selected_id != '':
-                #清空scene
-                self.scene().removeItem(self.item_dict[self.selected_id])
-                #清空侧边栏listwidget
-                items = self.list_widget.findItems(self.selected_id,Qt.MatchExactly)
-                row = self.list_widget.row(items[0])
-                self.list_widget.takeItem(row)
-                #清零选择
-                oldselected_id = self.selected_id#先保存旧值
-                self.list_widget.clearSelection()
-                self.clear_selection()
-                #清楚canvas item_dict
-                #该语句必须在clear_selection之后，否则会访问被该语句删除的地方
-                del self.item_dict[oldselected_id]
+    def delete_item(self):
+        if self.selected_id != '':
+            # 清空scene
+            self.scene().removeItem(self.item_dict[self.selected_id])
+            # 清空侧边栏listwidget
+            items = self.list_widget.findItems(self.selected_id, Qt.MatchExactly)
+            row = self.list_widget.row(items[0])
+            self.list_widget.takeItem(row)
+            # 清零选择
+            oldselected_id = self.selected_id  # 先保存旧值
+            self.list_widget.clearSelection()
+            self.clear_selection()
+            # 清楚canvas item_dict
+            # 该语句必须在clear_selection之后，否则会访问被该语句删除的地方
+            del self.item_dict[oldselected_id]
 
-                self.main_window.statusBar().showMessage('删除图元： %s' % oldselected_id)
-                self.updateScene([self.sceneRect()])
-                super().keyPressEvent(event)
-        elif event.key() == Qt.Key_C:
-            if self.selected_id != '':
-                item = self.item_dict[self.selected_id]
-                self.cpx_item = MyItem('0', item.item_type, item.p_list, item.pen, item.algorithm, item.finish)
-                self.main_window.statusBar().showMessage('复制图元： %s' % self.selected_id)
-                self.updateScene([self.sceneRect()])
-                super().keyPressEvent(event)
-        elif event.key() == Qt.Key_X:
-            if self.selected_id != '':
-                # 剪切
-                self.cpx_item = self.item_dict[self.selected_id]
-                # 清空scene
-                self.scene().removeItem(self.item_dict[self.selected_id])
-                # 清空侧边栏listwidget
-                items = self.list_widget.findItems(self.selected_id, Qt.MatchExactly)
-                row = self.list_widget.row(items[0])
-                self.list_widget.takeItem(row)
-                # 清零选择
-                oldselected_id = self.selected_id  # 先保存旧值
-                self.list_widget.clearSelection()
-                self.clear_selection()
-                # 清楚canvas item_dict
-                # 该语句必须在clear_selection之后，否则会访问被该语句删除的地方
-                del self.item_dict[oldselected_id]
-
-                self.main_window.statusBar().showMessage('剪切图元： %s' % oldselected_id)
-                self.updateScene([self.sceneRect()])
-                super().keyPressEvent(event)
-        elif event.key() == Qt.Key_V:
-            if self.painting == False and self.cpx_item is not None:
-                if self.cpx_item.id == '0':
-                    self.cpx_item.id = self.main_window.get_id()
-                self.scene().addItem(self.cpx_item)
-                self.item_dict[self.cpx_item.id] = self.cpx_item
-                self.list_widget.addItem(self.cpx_item.id)
-
-                self.main_window.statusBar().showMessage('粘贴图元： %s' % self.cpx_item.id)
-                self.cpx_item = None
-            else:
-                self.main_window.statusBar().showMessage('没有复制或剪切的图元')
+            self.main_window.statusBar().showMessage('删除图元： %s' % oldselected_id)
             self.updateScene([self.sceneRect()])
-            super().keyPressEvent(event)
+        else:
+            self.main_window.statusBar().showMessage('请选择图元')
+
+    def copy_item(self):
+        if self.selected_id != '':
+            item = self.item_dict[self.selected_id]
+            self.cpx_item = MyItem('0', item.item_type, item.p_list, item.pen, item.algorithm, item.finish)
+            self.main_window.statusBar().showMessage('复制图元： %s' % self.selected_id)
+            self.updateScene([self.sceneRect()])
+        else:
+            self.main_window.statusBar().showMessage('请选择图元')
+
+    def paste_item(self):
+        if self.painting == False and self.cpx_item is not None:
+            if self.cpx_item.id == '0':
+                self.cpx_item.id = self.main_window.get_id()
+
+            self.cpx_item.p_list = alg.translate(self.cpx_item.p_list, 10, 10)
+            self.scene().addItem(self.cpx_item)
+            self.item_dict[self.cpx_item.id] = self.cpx_item
+            self.list_widget.addItem(self.cpx_item.id)
+
+            self.main_window.statusBar().showMessage('粘贴图元： %s' % self.cpx_item.id)
+            self.cpx_item = None
+        else:
+            self.main_window.statusBar().showMessage('没有复制或剪切的图元')
+        self.updateScene([self.sceneRect()])
+
 
 
     def onlyonepoint(self):
@@ -895,6 +877,12 @@ class MainWindow(QMainWindow):
         clip_cohen_sutherland_act = clip_menu.addAction('Cohen-Sutherland')
         clip_liang_barsky_act = clip_menu.addAction('Liang-Barsky')
 
+        edit_menu = menubar.addMenu('图元编辑')
+        delete_item_act = edit_menu.addAction('删除图元')
+        copy_item_act = edit_menu.addAction('复制图元')
+        paste_item_act = edit_menu.addAction('粘贴图元')
+
+
         # 连接信号和槽函数
         # 文件目录
         set_pen_act.triggered.connect(self.set_pen_action)
@@ -933,6 +921,10 @@ class MainWindow(QMainWindow):
         self.list_widget.itemClicked.connect(self.canvas_widget.selection_changed)
         #self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
 
+        #图元编辑
+        delete_item_act.triggered.connect(self.delete_item_action)
+        copy_item_act.triggered.connect(self.copy_item_action)
+        paste_item_act.triggered.connect(self.paste_item_action)
 
         # 设置主窗口的布局
         self.hbox_layout = QHBoxLayout()
@@ -1160,6 +1152,16 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage('请先完成当前绘制')
 
+    #编辑目录
+    def delete_item_action(self):
+        self.canvas_widget.delete_item()
+
+    def copy_item_action(self):
+        self.canvas_widget.copy_item()
+
+
+    def paste_item_action(self):
+        self.canvas_widget.paste_item()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
