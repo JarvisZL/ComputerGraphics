@@ -50,6 +50,7 @@ class MyCanvas(QGraphicsView):
         self.oldplist = []
         self.oldbdrect = []
         self.clip_item = None
+        self.cpx_item = None
 
 
     # 开始绘制操作
@@ -114,7 +115,6 @@ class MyCanvas(QGraphicsView):
     def click_selection(self, selecteditem):
         if selecteditem  == None:
             return
-        print(selecteditem.p_list)
         self.main_window.statusBar().showMessage('图元选择: %s' % selecteditem.id)
         if self.selected_id != '':
             self.item_dict[self.selected_id].selected = False
@@ -221,6 +221,49 @@ class MyCanvas(QGraphicsView):
                 self.main_window.statusBar().showMessage('删除图元： %s' % oldselected_id)
                 self.updateScene([self.sceneRect()])
                 super().keyPressEvent(event)
+        elif event.key() == Qt.Key_C:
+            if self.selected_id != '':
+                item = self.item_dict[self.selected_id]
+                self.cpx_item = MyItem('0', item.item_type, item.p_list, item.pen, item.algorithm, item.finish)
+                self.main_window.statusBar().showMessage('复制图元： %s' % self.selected_id)
+                self.updateScene([self.sceneRect()])
+                super().keyPressEvent(event)
+        elif event.key() == Qt.Key_X:
+            if self.selected_id != '':
+                # 剪切
+                self.cpx_item = self.item_dict[self.selected_id]
+                # 清空scene
+                self.scene().removeItem(self.item_dict[self.selected_id])
+                # 清空侧边栏listwidget
+                items = self.list_widget.findItems(self.selected_id, Qt.MatchExactly)
+                row = self.list_widget.row(items[0])
+                self.list_widget.takeItem(row)
+                # 清零选择
+                oldselected_id = self.selected_id  # 先保存旧值
+                self.list_widget.clearSelection()
+                self.clear_selection()
+                # 清楚canvas item_dict
+                # 该语句必须在clear_selection之后，否则会访问被该语句删除的地方
+                del self.item_dict[oldselected_id]
+
+                self.main_window.statusBar().showMessage('剪切图元： %s' % oldselected_id)
+                self.updateScene([self.sceneRect()])
+                super().keyPressEvent(event)
+        elif event.key() == Qt.Key_V:
+            if self.painting == False and self.cpx_item is not None:
+                if self.cpx_item.id == '0':
+                    self.cpx_item.id = self.main_window.get_id()
+                self.scene().addItem(self.cpx_item)
+                self.item_dict[self.cpx_item.id] = self.cpx_item
+                self.list_widget.addItem(self.cpx_item.id)
+
+                self.main_window.statusBar().showMessage('粘贴图元： %s' % self.cpx_item.id)
+                self.cpx_item = None
+            else:
+                self.main_window.statusBar().showMessage('没有复制或剪切的图元')
+            self.updateScene([self.sceneRect()])
+            super().keyPressEvent(event)
+
 
     def onlyonepoint(self):
         if len(self.temp_item.p_list) == 2:
