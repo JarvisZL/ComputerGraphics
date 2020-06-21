@@ -881,6 +881,9 @@ class MainWindow(QMainWindow):
         delete_item_act = edit_menu.addAction('删除图元')
         copy_item_act = edit_menu.addAction('复制图元')
         paste_item_act = edit_menu.addAction('粘贴图元')
+        pencolor_change_act = edit_menu.addAction('更换图元边框颜色')
+        pensize_change_act = edit_menu.addAction('更换图元边框粗细')
+
 
 
         # 连接信号和槽函数
@@ -925,6 +928,8 @@ class MainWindow(QMainWindow):
         delete_item_act.triggered.connect(self.delete_item_action)
         copy_item_act.triggered.connect(self.copy_item_action)
         paste_item_act.triggered.connect(self.paste_item_action)
+        pencolor_change_act.triggered.connect(self.pencolor_change_action)
+        pensize_change_act.triggered.connect(self.pensize_change_action)
 
         # 设置主窗口的布局
         self.hbox_layout = QHBoxLayout()
@@ -946,8 +951,12 @@ class MainWindow(QMainWindow):
     def set_pen_action(self):
         if self.canvas_widget.painting == False:
             self.canvas_widget.clear_selection()#目的是为了取消keyboard的grab
-            self.canvas_widget.color = QColorDialog.getColor()
-            self.statusBar().showMessage('设置画笔颜色')
+            color = QColorDialog.getColor()
+            if color.isValid():
+                self.canvas_widget.color = color
+                self.statusBar().showMessage('设置画笔颜色')
+            else:
+                self.statusBar().showMessage('取消设置画笔颜色')
         else:
             self.statusBar().showMessage('请先完成当前绘制')
 
@@ -1159,9 +1168,36 @@ class MainWindow(QMainWindow):
     def copy_item_action(self):
         self.canvas_widget.copy_item()
 
-
     def paste_item_action(self):
         self.canvas_widget.paste_item()
+
+    def pencolor_change_action(self):
+        if self.canvas_widget.selected_id != '':
+            self.canvas_widget.clear_selection()#目的是为了取消keyboard的grab
+            oldpen = self.canvas_widget.temp_item.pen
+            color = QColorDialog.getColor()
+            if color.isValid():
+                self.canvas_widget.temp_item.pen = QPen(color, oldpen.width())
+                self.statusBar().showMessage('更改图元边框颜色')
+            else:
+                self.statusBar().showMessage('取消更改图元边框颜色')
+        else:
+            self.statusBar().showMessage('请先选择图元')
+
+    def pensize_change_action(self):
+        if self.canvas_widget.selected_id != '':
+            self.canvas_widget.clear_selection()  # 目的是为了取消keyboard的grab
+            size, ok = QInputDialog.getText(self, '请输入新的笔的粗细', '1 <= size <= 10（默认为2)')
+            if ok:
+                if int(size) < 1 or int(size) > 10:
+                    self.statusBar().showMessage('您输入的数值不符合要求')
+                    return
+                oldpen = self.canvas_widget.temp_item.pen
+                self.canvas_widget.temp_item.pen = QPen(oldpen.color(),int(size))
+            self.statusBar().showMessage('更换图元边框粗细')
+        else:
+            self.statusBar().showMessage('请先选择图元')
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
