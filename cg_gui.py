@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QWidget,
     QStyleOptionGraphicsItem, QColorDialog, QInputDialog, QFileDialog)
-from PyQt5.QtGui import QPainter, QMouseEvent, QColor, QIcon, QPen, QKeyEvent, QTransform
+from PyQt5.QtGui import QPainter, QMouseEvent, QColor, QIcon, QPen, QTransform, QPalette
 from PyQt5.QtCore import QRectF, QPoint, Qt
 
 
@@ -296,9 +296,16 @@ class MyCanvas(QGraphicsView):
                     self.temp_item.p_list.append([x, y])
         else:
             if self.onlyonepoint() == True:
-                self.setCursor(Qt.SizeAllCursor)
-                self.editstatus = 'Translate'
-                self.editoriginpoint = [x, y]
+                if abs(self.temp_item.p_list[0][0] - x) <= 5 and abs(self.temp_item.p_list[0][1] - y) <= 5:
+                    self.setCursor(Qt.SizeAllCursor)
+                    self.editstatus = 'Translate'
+                    self.editoriginpoint = [x, y]
+                else:
+                    self.unsetCursor()
+                    self.editstatus = ''
+                    self.editoriginpoint.clear()
+                    self.main_window.list_widget.clearSelection()
+                    self.clear_selection()
             else:
                 area = self.getPointArea(x, y)
                 if area == 'Translate':
@@ -347,7 +354,10 @@ class MyCanvas(QGraphicsView):
             # 并未处在edit状态中
             if self.editstatus == '':
                 if self.onlyonepoint() == True:
-                    self.setCursor(Qt.SizeAllCursor)
+                    if abs(self.temp_item.p_list[0][0] - x) <= 5 and abs(self.temp_item.p_list[0][1] - y) <= 5:
+                        self.setCursor(Qt.SizeAllCursor)
+                    else:
+                        self.unsetCursor()
                 else:
                     area = self.getPointArea(x, y)
                     if area == 'Translate':
@@ -1203,5 +1213,9 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon('../Icon.png'))
     mw = MainWindow()
+    # pe = QPalette()
+    # pe.setColor(QPalette.Window, Qt.lightGray)
+    # mw.setAutoFillBackground(True)
+    # mw.setPalette(pe)
     mw.show()
     sys.exit(app.exec_())
